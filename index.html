@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<title>Planner — Monte Castelo</title>
+<style>
+  :root {
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-card: #334155;
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --border: rgba(255,255,255,0.1);
+    --accent: #0ea5e9;
+    --accent-dark: #0284c7;
+    --verde: #10b981;
+    --amarelo: #f59e0b;
+    --vermelho: #ef4444;
+    --cinza: #64748b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; overflow-x: hidden; }
+
+  #loading { position: fixed; inset: 0; background: var(--bg-primary); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 999; }
+  .loading-logo { font-size: 48px; margin-bottom: 16px; }
+  .loading-title { font-size: 22px; font-weight: 700; color: var(--accent); margin-bottom: 8px; }
+  .loading-sub { font-size: 14px; color: var(--text-secondary); margin-bottom: 32px; }
+  .loading-spinner { width: 36px; height: 36px; border: 3px solid rgba(14,165,233,0.2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .screen { display: none; min-height: 100vh; flex-direction: column; }
+  .screen.active { display: flex; }
+
+  .topbar { background: var(--accent); padding: 16px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 12px rgba(0,0,0,0.3); }
+  .topbar-title { font-size: 17px; font-weight: 700; color: white; }
+  .topbar-sub { font-size: 12px; color: rgba(255,255,255,0.75); margin-top: 1px; }
+  .topbar-right { margin-left: auto; background: rgba(255,255,255,0.2); border: none; color: white; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; }
+
+  .content { flex: 1; padding: 16px; overflow-y: auto; max-width: 900px; width: 100%; margin: 0 auto; }
+
+  .card { background: var(--bg-secondary); border-radius: 14px; padding: 14px; margin-bottom: 12px; border: 0.5px solid var(--border); }
+  .card-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+
+  input[type="text"], input[type="email"], input[type="password"], select, textarea {
+    width: 100%; padding: 11px 14px; border-radius: 10px; border: 0.5px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.05); color: var(--text-primary); font-size: 16px;
+    font-family: inherit; outline: none; transition: border-color 0.2s;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  select option { background: #1e293b; }
+  textarea { resize: vertical; min-height: 70px; }
+  label.fld { display:block; font-size:12px; color:var(--text-secondary); margin:10px 0 5px; font-weight:600; }
+
+  .btn { width: 100%; padding: 14px; border-radius: 12px; border: none; font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; transition: opacity 0.2s; }
+  .btn:active { opacity: 0.8; }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-secondary { background: rgba(255,255,255,0.08); color: var(--text-primary); border: 0.5px solid var(--border); }
+  .btn-danger { background: rgba(239,68,68,0.15); color: var(--vermelho); border: 0.5px solid rgba(239,68,68,0.3); }
+
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  .badge-todo { background: rgba(14,165,233,0.2); color: var(--accent); }
+  .badge-doing { background: rgba(245,158,11,0.2); color: var(--amarelo); }
+  .badge-done { background: rgba(16,185,129,0.2); color: var(--verde); }
+
+  .empty { text-align: center; padding: 30px 16px; color: var(--text-secondary); font-size: 13px; line-height: 1.6; }
+
+  .search-wrap { position: relative; margin-bottom: 12px; }
+  .search-wrap input { padding-left: 40px; }
+  .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-secondary); font-size: 16px; pointer-events: none; }
+
+  .segmented { display:flex; gap:6px; background:var(--bg-secondary); border:0.5px solid var(--border); border-radius:12px; padding:4px; margin-bottom:14px; }
+  .segmented button { flex:1; padding:8px; border:none; border-radius:9px; background:transparent; color:var(--text-secondary); font-weight:600; font-size:13px; font-family:inherit; cursor:pointer; }
+  .segmented button.on { background:var(--accent); color:#fff; }
+
+  .board { display:flex; gap:12px; overflow-x:auto; padding-bottom:6px; -webkit-overflow-scrolling:touch; }
+  .col { flex:0 0 84%; max-width:300px; background:var(--bg-secondary); border:0.5px solid var(--border); border-radius:14px; padding:10px; }
+  @media(min-width:760px){ .col{ flex:1; max-width:none; } }
+  .col-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; padding:2px 4px; }
+  .col-title { font-size:13px; font-weight:700; letter-spacing:.02em; }
+  .col-count { font-size:12px; color:var(--text-secondary); background:rgba(255,255,255,0.06); border-radius:20px; padding:1px 9px; }
+
+  .task { background:var(--bg-primary); border:0.5px solid var(--border); border-left:4px solid var(--accent); border-radius:12px; padding:11px 12px; margin-bottom:9px; cursor:pointer; transition:opacity .15s; }
+  .task:active { opacity:.85; }
+  .task.st-doing { border-left-color:var(--amarelo); }
+  .task.st-done  { border-left-color:var(--verde); }
+  .task-top { display:flex; align-items:flex-start; gap:8px; }
+  .task-title { font-size:14px; font-weight:600; color:var(--text-primary); flex:1; line-height:1.3; }
+  .task-title.done { text-decoration:line-through; color:var(--text-secondary); }
+  .prio-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; margin-top:4px; }
+  .prio-baixa{ background:var(--cinza); } .prio-media{ background:var(--amarelo); } .prio-alta{ background:var(--vermelho); }
+  .task-tags { display:flex; flex-wrap:wrap; gap:5px; margin-top:8px; }
+  .task-foot { display:flex; justify-content:flex-end; gap:6px; margin-top:9px; }
+  .movebtn { width:30px; height:26px; border-radius:8px; border:0.5px solid var(--border); background:rgba(255,255,255,0.05); color:var(--text-secondary); font-size:15px; cursor:pointer; font-family:inherit; }
+  .movebtn:disabled { opacity:.3; cursor:default; }
+
+  .tagchip { font-size:10px; font-weight:700; padding:2px 8px; border-radius:20px; color:#0f172a; }
+  .tagpick { display:flex; flex-wrap:wrap; gap:6px; }
+  .tagpick .tagchip { cursor:pointer; opacity:.45; border:1px solid transparent; }
+  .tagpick .tagchip.sel { opacity:1; box-shadow:0 0 0 2px rgba(255,255,255,.25); }
+  .tag-add { font-size:11px; font-weight:700; padding:3px 10px; border-radius:20px; background:rgba(255,255,255,0.06); color:var(--text-secondary); border:0.5px dashed var(--border); cursor:pointer; }
+
+  .fab { position:fixed; right:18px; bottom:20px; width:56px; height:56px; border-radius:50%; background:var(--accent); color:#fff; border:none; font-size:28px; cursor:pointer; box-shadow:0 6px 18px rgba(2,132,199,.5); z-index:20; }
+
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center; z-index: 500; padding: 20px; }
+  .modal-backdrop.open { display: flex; }
+  .modal { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 18px; padding: 20px; width: 100%; max-width: 420px; max-height: 88vh; overflow-y:auto; animation: modalIn 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  @keyframes modalIn { from { opacity: 0; transform: translateY(20px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  .modal-titulo { font-size: 18px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+  .modal-erro { font-size: 12px; color: var(--vermelho); margin-top: 8px; min-height: 15px; font-weight: 500; }
+  .modal-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+  .login-wrap { max-width:360px; margin:0 auto; padding:40px 16px; }
+  .login-logo { text-align:center; font-size:40px; margin-bottom:6px; }
+  .login-title { text-align:center; font-size:22px; font-weight:700; color:var(--accent); margin-bottom:4px; }
+  .login-sub { text-align:center; font-size:13px; color:var(--text-secondary); margin-bottom:24px; }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="loading-logo">🗂️</div>
+  <div class="loading-title">Planner</div>
+  <div class="loading-sub">Monte Castelo</div>
+  <div class="loading-spinner"></div>
+</div>
+
+<div class="screen" id="screen-login">
+  <div class="content">
+    <div class="login-wrap">
+      <div class="login-logo">🗂️</div>
+      <div class="login-title">Planner</div>
+      <div class="login-sub">Entre com seu e-mail e senha</div>
+      <div class="card">
+        <label class="fld">E-mail</label>
+        <input type="email" id="login-email" autocomplete="username" placeholder="voce@montecastelo.ind.br"/>
+        <label class="fld">Senha</label>
+        <input type="password" id="login-pass" autocomplete="current-password" placeholder="senha" onkeydown="if(event.key==='Enter')entrar()"/>
+        <div class="modal-erro" id="login-err"></div>
+        <button class="btn btn-primary" onclick="entrar()" style="margin-top:6px;">Entrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="screen" id="screen-noaccess">
+  <div class="content">
+    <div class="login-wrap">
+      <div class="login-logo">🔒</div>
+      <div class="login-title" style="color:var(--vermelho);">Sem acesso</div>
+      <div class="login-sub">Sua conta ainda não está liberada para o Planner. Peça ao administrador para liberar seu acesso.</div>
+      <div class="card"><div id="noaccess-email" style="font-size:13px;color:var(--text-secondary);text-align:center;"></div></div>
+      <button class="btn btn-secondary" onclick="sair()">Sair</button>
+    </div>
+  </div>
+</div>
+
+<div class="screen" id="screen-app">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">🗂️ Planner</div>
+      <div class="topbar-sub" id="app-userlabel"></div>
+    </div>
+    <button class="topbar-right" onclick="sair()">Sair</button>
+  </div>
+  <div class="content">
+    <div class="segmented">
+      <button id="tab-board" class="on" onclick="setView('board')">Kanban</button>
+      <button id="tab-list" onclick="setView('list')">Lista</button>
+    </div>
+    <div id="app-err" style="color:var(--vermelho);font-size:12px;margin-bottom:8px;"></div>
+    <div id="view-container"></div>
+  </div>
+  <button class="fab" onclick="novaTarefa()">+</button>
+</div>
+
+<div class="modal-backdrop" id="modal-task">
+  <div class="modal">
+    <div class="modal-titulo" id="task-modal-title">Nova tarefa</div>
+    <label class="fld">Título</label>
+    <input type="text" id="t-titulo" placeholder="Ex.: Ligar para fornecedor"/>
+    <label class="fld">Descrição</label>
+    <textarea id="t-desc" placeholder="Detalhes (opcional)"></textarea>
+    <label class="fld">Status</label>
+    <select id="t-status"><option value="todo">A fazer</option><option value="doing">Fazendo</option><option value="done">Feito</option></select>
+    <label class="fld">Prioridade</label>
+    <select id="t-prio"><option value="baixa">Baixa</option><option value="media">Média</option><option value="alta">Alta</option></select>
+    <label class="fld">Tags</label>
+    <div class="tagpick" id="t-tags"></div>
+    <div class="modal-erro" id="task-err"></div>
+    <div class="modal-btns">
+      <button class="btn btn-secondary" onclick="fecharModal('modal-task')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarTarefa()">Salvar</button>
+    </div>
+    <button class="btn btn-danger" id="t-excluir" style="margin-top:10px;display:none;" onclick="excluirTarefa()">Excluir tarefa</button>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, addDoc, deleteDoc, setDoc, updateDoc, doc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCH_t074MvkJn-qVMvCtLfEMaQHf_e_d7M",
+  authDomain: "manutencao-comodato.firebaseapp.com",
+  projectId: "manutencao-comodato"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+const COL = 'planner';
+const STATUS = [ {k:'todo',nome:'A fazer'}, {k:'doing',nome:'Fazendo'}, {k:'done',nome:'Feito'} ];
+const PALETA = ['#0ea5e9','#f59e0b','#10b981','#a855f7','#ef4444','#14b8a6','#f472b6','#84cc16'];
+
+let currentUser = null;
+let tasks = [];
+let tagsCfg = [];
+let unsub = null;
+let view = 'board';
+let editId = null;
+let selTags = [];
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById('loading').style.display='none'; const el=document.getElementById(id); if(el) el.classList.add('active'); }
+function nextK(k,dir){ const i=STATUS.findIndex(s=>s.k===k); const j=i+dir; return (j<0||j>=STATUS.length)?null:STATUS[j].k; }
+
+setPersistence(auth, browserLocalPersistence).catch(e=>console.warn('persist',e));
+const savedEmail = localStorage.getItem('planner_email');
+if(savedEmail){ const f=document.getElementById('login-email'); if(f) f.value=savedEmail; }
+
+window.entrar = function(){
+  const email=(document.getElementById('login-email').value||'').trim();
+  const pass=document.getElementById('login-pass').value||'';
+  document.getElementById('login-err').textContent='';
+  if(!email||!pass){ document.getElementById('login-err').textContent='Preencha e-mail e senha.'; return; }
+  localStorage.setItem('planner_email',email);
+  signInWithEmailAndPassword(auth,email,pass).catch(e=>{
+    document.getElementById('login-err').textContent='Não foi possível entrar ('+(e.code||e.message)+').';
+  });
+};
+window.sair = function(){ signOut(auth).catch(e=>console.warn(e)); };
+
+onAuthStateChanged(auth, async (user)=>{
+  if(unsub){ unsub(); unsub=null; }
+  currentUser = user;
+  if(!user){ tasks=[]; tagsCfg=[]; showScreen('screen-login'); return; }
+  let ok=false;
+  try{ const us=await getDoc(doc(db,'usuarios',user.uid)); ok = us.exists() && us.data().ativo===true; }
+  catch(e){ console.warn('allowlist',e); ok=false; }
+  if(!ok){ document.getElementById('noaccess-email').textContent=user.email||''; showScreen('screen-noaccess'); return; }
+  document.getElementById('app-userlabel').textContent = user.email||'';
+  subscribe();
+  showScreen('screen-app');
+});
+
+function subscribe(){
+  const errEl=document.getElementById('app-err'); errEl.textContent='';
+  unsub = onSnapshot(collection(db,COL), snap=>{
+    tasks=[]; tagsCfg=[];
+    snap.forEach(d=>{ const x=d.data()||{}; if(x.type==='config'){ tagsCfg=x.tags||[]; } else { tasks.push(Object.assign({id:d.id}, x)); } });
+    tasks.sort((a,b)=>(a.ordem||0)-(b.ordem||0));
+    render();
+  }, err=>{ errEl.textContent='Erro ao carregar (permissão?): '+err.message; });
+}
+
+window.setView = function(v){ view=v; document.getElementById('tab-board').classList.toggle('on',v==='board'); document.getElementById('tab-list').classList.toggle('on',v==='list'); render(); };
+
+function corTag(nome){ const t=tagsCfg.find(x=>x.nome===nome); return t?t.cor:'#64748b'; }
+function tagChip(nome){ return '<span class="tagchip" style="background:'+corTag(nome)+';">'+esc(nome)+'</span>'; }
+
+function taskCard(t){
+  const prev=nextK(t.status,-1), next=nextK(t.status,1);
+  const tagsH=(t.tags||[]).map(tagChip).join('');
+  return '<div class="task st-'+esc(t.status)+'" onclick="editarTarefa(\''+t.id+'\')">'+
+    '<div class="task-top"><span class="prio-dot prio-'+esc(t.prioridade||'baixa')+'"></span>'+
+    '<span class="task-title'+(t.status==='done'?' done':'')+'">'+esc(t.titulo)+'</span></div>'+
+    (tagsH?'<div class="task-tags">'+tagsH+'</div>':'')+
+    '<div class="task-foot">'+
+      '<button class="movebtn" '+(prev?'':'disabled')+' onclick="event.stopPropagation();moverStatus(\''+t.id+'\',-1)">‹</button>'+
+      '<button class="movebtn" '+(next?'':'disabled')+' onclick="event.stopPropagation();moverStatus(\''+t.id+'\',1)">›</button>'+
+    '</div></div>';
+}
+
+function renderBoard(){
+  return '<div class="board">'+ STATUS.map(s=>{
+    const list=tasks.filter(t=>t.status===s.k);
+    const cards=list.length?list.map(taskCard).join(''):'<div class="empty" style="padding:16px;">—</div>';
+    return '<div class="col"><div class="col-head"><span class="col-title">'+s.nome+'</span><span class="col-count">'+list.length+'</span></div>'+cards+'</div>';
+  }).join('') +'</div>';
+}
+
+function renderList(){
+  const q=(document.getElementById('list-srch')?document.getElementById('list-srch').value:'').toLowerCase();
+  let list=tasks.slice().sort((a,b)=>{ const o={todo:0,doing:1,done:2}; return (o[a.status]-o[b.status])||((a.ordem||0)-(b.ordem||0)); });
+  if(q) list=list.filter(t=>(t.titulo||'').toLowerCase().includes(q)||(t.descricao||'').toLowerCase().includes(q));
+  const badge={todo:'badge-todo',doing:'badge-doing',done:'badge-done'};
+  const nome={todo:'A fazer',doing:'Fazendo',done:'Feito'};
+  const rows=list.length?list.map(t=>{
+    const tagsH=(t.tags||[]).map(tagChip).join(' ');
+    return '<div class="task st-'+esc(t.status)+'" onclick="editarTarefa(\''+t.id+'\')">'+
+      '<div class="task-top"><span class="prio-dot prio-'+esc(t.prioridade||'baixa')+'"></span>'+
+      '<span class="task-title'+(t.status==='done'?' done':'')+'">'+esc(t.titulo)+'</span>'+
+      '<span class="badge '+badge[t.status]+'">'+nome[t.status]+'</span></div>'+
+      (tagsH?'<div class="task-tags">'+tagsH+'</div>':'')+'</div>';
+  }).join(''):'<div class="empty">Nenhuma tarefa ainda.<br>Toque em <b>+</b> para criar a primeira.</div>';
+  return '<div class="search-wrap"><span class="search-icon">🔎</span><input type="text" id="list-srch" placeholder="Buscar tarefa..." oninput="render()" value="'+esc(q)+'"/></div>'+rows;
+}
+
+function render(){
+  const c=document.getElementById('view-container');
+  if(!c) return;
+  const focus = document.activeElement && document.activeElement.id==='list-srch';
+  c.innerHTML = view==='board' ? renderBoard() : renderList();
+  if(focus){ const s=document.getElementById('list-srch'); if(s){ s.focus(); s.selectionStart=s.value.length; } }
+}
+window.render = render;
+
+window.moverStatus = function(id, dir){
+  const t=tasks.find(x=>x.id===id); if(!t) return;
+  const nk=nextK(t.status,dir); if(!nk) return;
+  updateDoc(doc(db,COL,id), {status:nk}).catch(e=>{ alert('Erro ao mover: '+e.message); });
+};
+
+function renderTagPicker(){
+  const box=document.getElementById('t-tags');
+  const chips=tagsCfg.map(t=>'<span class="tagchip'+(selTags.includes(t.nome)?' sel':'')+'" style="background:'+t.cor+';" onclick="toggleTag(\''+esc(t.nome).replace(/'/g,'')+'\')">'+esc(t.nome)+'</span>').join('');
+  box.innerHTML = chips + '<span class="tag-add" onclick="novaTag()">+ tag</span>';
+}
+window.toggleTag = function(nome){ const i=selTags.indexOf(nome); if(i>=0) selTags.splice(i,1); else selTags.push(nome); renderTagPicker(); };
+window.novaTag = function(){
+  const nome=(prompt('Nome da nova tag:')||'').trim(); if(!nome) return;
+  if(tagsCfg.some(t=>t.nome.toLowerCase()===nome.toLowerCase())){ if(!selTags.includes(nome)) selTags.push(nome); renderTagPicker(); return; }
+  const cor=PALETA[tagsCfg.length % PALETA.length];
+  const novo=tagsCfg.concat([{nome,cor}]);
+  setDoc(doc(db,COL,'config'), {type:'config', tags:novo}, {merge:true}).catch(e=>alert('Erro ao criar tag: '+e.message));
+  selTags.push(nome); tagsCfg=novo; renderTagPicker();
+};
+
+window.novaTarefa = function(){
+  editId=null; selTags=[];
+  document.getElementById('task-modal-title').textContent='Nova tarefa';
+  document.getElementById('t-titulo').value='';
+  document.getElementById('t-desc').value='';
+  document.getElementById('t-status').value='todo';
+  document.getElementById('t-prio').value='baixa';
+  document.getElementById('task-err').textContent='';
+  document.getElementById('t-excluir').style.display='none';
+  renderTagPicker();
+  abrirModal('modal-task');
+};
+window.editarTarefa = function(id){
+  const t=tasks.find(x=>x.id===id); if(!t) return;
+  editId=id; selTags=(t.tags||[]).slice();
+  document.getElementById('task-modal-title').textContent='Editar tarefa';
+  document.getElementById('t-titulo').value=t.titulo||'';
+  document.getElementById('t-desc').value=t.descricao||'';
+  document.getElementById('t-status').value=t.status||'todo';
+  document.getElementById('t-prio').value=t.prioridade||'baixa';
+  document.getElementById('task-err').textContent='';
+  document.getElementById('t-excluir').style.display='block';
+  renderTagPicker();
+  abrirModal('modal-task');
+};
+window.salvarTarefa = function(){
+  const titulo=(document.getElementById('t-titulo').value||'').trim();
+  if(!titulo){ document.getElementById('task-err').textContent='Informe um título.'; return; }
+  const dados={
+    type:'task', titulo,
+    descricao:(document.getElementById('t-desc').value||'').trim(),
+    status:document.getElementById('t-status').value,
+    prioridade:document.getElementById('t-prio').value,
+    tags:selTags.slice()
+  };
+  if(editId){
+    updateDoc(doc(db,COL,editId), dados).then(()=>fecharModal('modal-task')).catch(e=>{ document.getElementById('task-err').textContent='Erro ao salvar: '+e.message; });
+  } else {
+    dados.ordem=Date.now(); dados.criadoEm=Date.now(); dados.autor=currentUser?currentUser.email:'';
+    addDoc(collection(db,COL), dados).then(()=>fecharModal('modal-task')).catch(e=>{ document.getElementById('task-err').textContent='Erro ao criar: '+e.message; });
+  }
+};
+window.excluirTarefa = function(){
+  if(!editId) return;
+  if(!confirm('Excluir esta tarefa?')) return;
+  deleteDoc(doc(db,COL,editId)).then(()=>fecharModal('modal-task')).catch(e=>{ document.getElementById('task-err').textContent='Erro ao excluir: '+e.message; });
+};
+
+window.abrirModal = function(id){ document.getElementById(id).classList.add('open'); };
+window.fecharModal = function(id){ document.getElementById(id).classList.remove('open'); };
+
+setTimeout(()=>{ if(document.getElementById('loading').style.display!=='none' && !document.querySelector('.screen.active')){ showScreen('screen-login'); } }, 4000);
+</script>
+</body>
+</html>
