@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Importar Planner MS → Planner Monte Castelo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0f111a; --bg-2:#191c29; --bg-3:#212536; --steel:#3a4055;
+  --ink:#e7e9f0; --ink-mute:#868da3; --ink-faint:#5a6070;
+  --line:rgba(255,255,255,.07); --line-2:rgba(255,255,255,.12);
+  --orange:#2fae7d; --green:#1cc47e; --yellow:#f5b013; --red:#f26a6a; --blue:#5b8def;
+  --display:'Archivo Black',sans-serif; --sans:'Archivo',sans-serif; --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);min-height:100vh;padding-bottom:60px}
+.stripe{height:4px;background:repeating-linear-gradient(-45deg,var(--orange) 0 14px,var(--bg) 14px 28px)}
+header{padding:22px;border-bottom:2px solid var(--ink)}
+h1{font-family:var(--display);font-size:22px;text-transform:uppercase;letter-spacing:-.02em}
+.sub{font-family:var(--mono);font-size:10px;letter-spacing:.25em;color:var(--ink-mute);text-transform:uppercase;margin-top:6px}
+.wrap{max-width:1000px;margin:0 auto;padding:22px}
+.card{background:var(--bg-2);border:1px solid var(--line-2);border-top:2px solid var(--orange);padding:22px;margin-bottom:18px}
+.card h2{font-family:var(--display);font-size:14px;text-transform:uppercase;letter-spacing:-.01em;margin-bottom:14px}
+label.f{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.25em;text-transform:uppercase;color:var(--ink-mute);margin-bottom:8px}
+input{width:100%;background:var(--bg);border:1px solid var(--line-2);border-bottom:2px solid var(--steel);color:var(--ink);padding:12px;font-family:var(--mono);font-size:13px;outline:none;margin-bottom:14px}
+input:focus{border-bottom-color:var(--orange)}
+.btn{padding:14px 22px;border:none;font-family:var(--mono);font-size:11px;letter-spacing:.25em;text-transform:uppercase;font-weight:600;cursor:pointer;background:var(--orange);color:var(--bg)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-2{background:transparent;color:var(--ink);border:1px solid var(--line-2)}
+.erro{color:var(--red);font-family:var(--mono);font-size:11px;letter-spacing:.1em;min-height:16px;margin-top:8px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1px;background:var(--line-2);margin-bottom:18px}
+.stat{background:var(--bg-2);padding:14px}
+.stat .n{font-family:var(--display);font-size:26px;line-height:1}
+.stat .l{font-family:var(--mono);font-size:8px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-mute);margin-top:6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chip{padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600}
+.chip-s{background:var(--bg-3);border:1px solid var(--line-2);color:var(--ink);font-family:var(--mono);font-size:10px;letter-spacing:.05em}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-mute);text-align:left;padding:8px;border-bottom:1px solid var(--line-2);position:sticky;top:0;background:var(--bg-2)}
+td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+.tw{max-height:420px;overflow:auto;border:1px solid var(--line-2);background:var(--bg-2)}
+.pr{font-family:var(--mono);font-size:9px;padding:2px 6px;letter-spacing:.1em}
+.pr.Urgente{background:var(--red);color:#fff}.pr.Alta{background:var(--yellow);color:#111}
+.pr.Normal{background:var(--blue);color:#fff}.pr.Baixa{background:var(--steel);color:#fff}
+.st{font-family:var(--mono);font-size:9px;letter-spacing:.1em;color:var(--ink-mute)}
+#log{font-family:var(--mono);font-size:11px;line-height:1.7;max-height:280px;overflow:auto;background:var(--bg);border:1px solid var(--line-2);padding:14px;margin-top:14px;white-space:pre-wrap}
+.ok{color:var(--green)}.wr{color:var(--yellow)}.er{color:var(--red)}.mu{color:var(--ink-faint)}
+.bar{height:6px;background:var(--bg-3);margin-top:14px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--orange);transition:width .25s}
+.hide{display:none}
+.warn{background:rgba(245,176,19,.09);border:1px solid rgba(245,176,19,.35);padding:14px;font-size:13px;line-height:1.6;margin-bottom:18px}
+.warn b{color:var(--yellow)}
+</style>
+</head>
+<body>
+<div class="stripe"></div>
+<header>
+  <h1>Importar → Planner</h1>
+  <div class="sub">Direção Mc Copy · Microsoft Planner · somente tarefas não concluídas</div>
+</header>
+
+<div class="wrap">
+
+  <div class="card" id="cardLogin">
+    <h2>1 · Entrar</h2>
+    <label class="f">E-mail</label>
+    <input type="email" id="email" autocomplete="username" placeholder="seu@email.com.br">
+    <label class="f">Senha</label>
+    <input type="password" id="senha" autocomplete="current-password" placeholder="sua senha">
+    <button class="btn" id="btnLogin">Entrar</button>
+    <div class="erro" id="erroLogin"></div>
+  </div>
+
+  <div id="app" class="hide">
+
+    <div class="card">
+      <h2>2 · O que será importado</h2>
+      <div class="stats">
+        <div class="stat"><div class="n" id="nTot">—</div><div class="l">Tarefas</div></div>
+        <div class="stat"><div class="n" id="nAb">—</div><div class="l">Em aberto</div></div>
+        <div class="stat"><div class="n" id="nAnd">—</div><div class="l">Em andamento</div></div>
+        <div class="stat"><div class="n" id="nSet">—</div><div class="l">Setores novos</div></div>
+        <div class="stat"><div class="n" id="nRot">—</div><div class="l">Rótulos novos</div></div>
+      </div>
+      <label class="f">Setores (viram colunas do Kanban)</label>
+      <div class="chips" id="chSet"></div>
+      <label class="f" style="margin-top:16px">Rótulos</label>
+      <div class="chips" id="chRot"></div>
+    </div>
+
+    <div class="card">
+      <h2>3 · Prévia</h2>
+      <div class="tw"><table>
+        <thead><tr><th>#</th><th>Título</th><th>Setor</th><th>Responsável</th><th>Prazo</th><th>Prio</th><th>Status</th><th>Rótulos</th></tr></thead>
+        <tbody id="tb"></tbody>
+      </table></div>
+    </div>
+
+    <div class="card">
+      <h2>4 · Importar</h2>
+      <div class="warn">
+        Grava na coleção <b>planner</b> do projeto <b>manutencao-comodato</b> e acrescenta os setores,
+        responsáveis e rótulos em <b>planner/_config</b> (sem apagar os que já existem).<br>
+        Cada tarefa leva um campo <b>msTaskId</b>: se você rodar de novo, as já importadas são <b>puladas</b>, não duplicadas.
+      </div>
+      <button class="btn" id="btnImp">Importar agora</button>
+      <button class="btn btn-2" id="btnDry">Só conferir duplicidade</button>
+      <div class="bar"><i id="bar"></i></div>
+      <div id="log"></div>
+    </div>
+
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, getDocs, addDoc, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const DADOS = {"tarefas":[{"msTaskId":446,"titulo":"Contrato Aluguel Vitor Novo","descricao":"Fazer contrato Aluguel Vitor e etc.\n\nProgresso no Planner anterior: 50%","setor":"Ricardo","solicitante":"João Thomé","prioridade":"Normal","status":"andamento","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"31/05/2026","rotulos":[]},{"msTaskId":634,"titulo":"Ação Monitoria Tatiane (Guilherme)","descricao":"- Mandar Documentos p Guilherme?. Prazo p Pagamento acabou dia 07.07 Guilherme vai seguir com cobrança executiva judicial.\n\nCHECKLIST:\n- Aguardar Pagamento (16/04)\n- Congelar Contas e Carros Tatiane (16/04/24)\n- Cobrança Titulo Executivo Judicial (07/07) + Prazo 15 dias + Despersonificação PJ\n- Prazo 15 dias Pgto Tatiane (14/04 inicio)\n- Envio Comprovante\n- Entrar com Ação\n- Enviar Conversa Whats/email provas (Diogo)\n- Enviar Boleto e Notas Assinados (Simone)\n- Enviar Boletos e Notas e Relação (João)","setor":"Jurídico","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"31/08/2026","rotulos":["Jurídico"]},{"msTaskId":638,"titulo":"Ação ICMS BC IRPJ/CSLL (Meta)","descricao":"Papeis Assinados, Aguardando movimentação do Processo","setor":"Jurídico","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"29/07/2026","horaAbertura":"00:00","dataConclusao":null,"rotulos":[]},{"msTaskId":906,"titulo":"Analise Microbiologica Alimentos","descricao":"- Falar com Ricardo sobre fazer a Analise Microbiologica dos Alimentos. Fazer 5 por mes? preço alto? risco fiscalização","setor":"Ricardo","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"01/07/2026","rotulos":[]},{"msTaskId":907,"titulo":"Climatização Quadra e Cozinha","descricao":"Fazer Reunião Miguel e Jonathan Fazer Projeto Empresa Especializada","setor":"Ricardo","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"11/02/2026","horaAbertura":"09:00","dataConclusao":"01/07/2026","rotulos":["Produção"]},{"msTaskId":913,"titulo":"Redimensionar Caixa Litros (?)","descricao":"- Colocar caixa de 1000 litros Banheiros + 500 lt só p seu Adroaldo. -> Bacia de Contenção 60 mil litros (fundos da fábrica) ------------------------------------------ *Assuntos FEPAM* Caixa Separadora Agua/óleo (Oficina) -> Fazer Contenção p proteger a Caixa da agua suja e alagamento. Ricardo disse p dizer p FEPAM que a gente não utiliza mais e se a fiscalização bater vamos ter que pedir p pessoal parar tudo. -> Planilha Controle das Temperaturas (POP): Implementar esse controle, colocar em cada camara suporte de acrilico e folha com as temperaturas. Emerson 06hrs e Mauricio 18hrs. -> Planilha de Manutenção Preventiva Máquina gelo e das Camaras: Criar. Vai ficar com Miguel o controle.","setor":"Ricardo","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"01/07/2026","rotulos":[]},{"msTaskId":914,"titulo":"Noel Planta Prefeitura","descricao":"Prefeitura tem imagens de que temos construção fora do lugar e arvoreQs também\n\nCHECKLIST:\n- Aprovação do Dmae - ? (Dependendo Projeto Hidro)\n- EVU (errado) Aprovado\n- Noel marcar Reunião Prefeitura - Verificar Itens Pendentes (03/09) - 25/09 09:30hrs\n- Prefeitura solicitou novos documentos - 26/08\n- Refazer EVU\n- Assinar Autorização e Documentos - João","setor":"Simone Thomé - Financeiro","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"01/06/2026","rotulos":["Projetos","Estratégico"]},{"msTaskId":953,"titulo":"GiroFreezer - Compra","descricao":"CHECKLIST:\n- Compra - ?\n- Reunião Alexandre - 30/06\n- Verificar Financiamento Sicredi - ?\n- Kalfritec: Aguardando Orçamento - 28/03\n- Pegar Orçamento Fossati - Aguardando (14/03)\n- Conversar Ricardo, Diogo e Jonathan\n- Reunião Fossati\n- Girofreezer Embaflux (?)\n- Calcular Economias com Giro + GA Nova\n- Visita Fábrica 07/08","setor":"Ricardo","solicitante":"João Thomé","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"30/07/2026","rotulos":["Produção","Estratégico"]},{"msTaskId":980,"titulo":"Caixa Separadora Utilidade","descricao":"- Temos até 2028 para fazer OUTRA Caixa Separadora p caminhões, eles acham que a nossa é p limpeza dos caminhões também.","setor":"Ricardo","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"31/08/2026","horaAbertura":"09:00","dataConclusao":"31/08/2026","rotulos":[]},{"msTaskId":991,"titulo":"Projeto Noel (Terreno Lado)","descricao":"CHECKLIST:\n- Juiz Aprovar Usocapião\n- Projeto - Indicação Pian\n- Matricula (Santa Maria) - Ricardo\n- Reunião Noel - Tirar Medidas 23/07","setor":"Ricardo","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"01/05/2026","horaAbertura":"09:00","dataConclusao":"01/07/2026","rotulos":["Projetos","Estratégico"]},{"msTaskId":993,"titulo":"Anderson Virar Gerente","descricao":"Lindomar vai sair em Junho. Ideia era no fim de Janeiro o Lindomar apresentar p Anderson o Litoral formalmente. Aline vai voltar em Junho (está grávida). Anderson vai cuidar de Santa Maria até lá\n\nCHECKLIST:\n- Fazer os Cálculos - 06/02","setor":"Diogo - Comercial","solicitante":"João Thomé","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"17/04/2026","rotulos":["RH","Estratégico"]},{"msTaskId":1006,"titulo":"Projeto Hidrosanitário","descricao":"- Projeto Hidrosanitário: c/ Noel - Observação: tem que entrar TUDO como é, a da Quadra vai p arroio, e a gente disse que não vai.\n\nCHECKLIST:\n- Ricardo: Ver sobre Fossa\n- Emissão Certificado\n- Aprovação do Dmae\n- Dmae: quer Projeto Arquitetonico (28/05)\n- Visita Prefeitura\n- Miguel vai mandar Instruções\n- Projeto da Bacia de Amortecimento\n- Reunião c/ Eng 26/02 Quarta\n- Analise Planta Hidro - João e Miguel 19/02\n- Aguardando Aprovação EVU (21/10)\n- Envio Projeto Assinado Noel\n- Assinatura do Projeto\n- Aprovação do Projeto\n- Ligar Noel\n- Alinhamento c/ Ricardo\n- Gabriela/Renata - CSAO passar pela Fossa - 08/08\n- Envio do Projeto\n- Apresentação Projeto - Noel\n- Medidas Fossa - Miguel (29/07)\n- Reunião Noel","setor":"Simone Thomé - Financeiro","solicitante":"João Thomé","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"30/05/2026","rotulos":["Projetos","Estratégico"]},{"msTaskId":1014,"titulo":"Quebra Contrato NacionalGás (Inicial)","descricao":"CHECKLIST:\n- Audiência Conciliação\n- Liminar\n- Entra Ação\n- Contato com NacionalGás\n- Aprovar Orçamento Sabrina - Ricardo","setor":"Jurídico","solicitante":"João Thomé","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"27/07/2026","rotulos":["Jurídico"]},{"msTaskId":1026,"titulo":"Compra Terreno Vizinho (Casa Madeira)","descricao":"Vizinho quer 400k pelo terreno, optamos em deixar em stand-by","setor":"Ricardo","solicitante":"Não atribuído","prioridade":"Alta","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"31/12/2026","rotulos":[]},{"msTaskId":1061,"titulo":"Documentar Procedimento Massas","descricao":"- Procedimento da Produção de Massa. Ver com Gabi\n\nCHECKLIST:\n- Prazo Final: 05/10","setor":"Jonathan Thomé","solicitante":"João Thomé","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"30/04/2026","rotulos":["Produção"]},{"msTaskId":1063,"titulo":"Retirar Insalubridade Indevida","descricao":"Retirar Insalubridade de que não precisa ter - Fazer laudo de insalubridade de um terceiro p corroobar c tese p tirar insalubridade","setor":"Jurídico","solicitante":"João Thomé","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"30/04/2026","rotulos":["RH","Financeiro"]},{"msTaskId":1145,"titulo":"Processo Emerson Silva (Sentença)","descricao":"Audiência TelePresencial 27/08 10:30hrs\n\nCHECKLIST:\n- Aguardar Sentença\n- Audiência TelePresencial 25/09 15:30 h\n- Audiência TelePresencial 27/08 10:30hrs CANCELADA\n- Audiência Conciliação 18/08 13:30hrs Telepresencial","setor":"Jurídico","solicitante":"João Thomé","prioridade":"Normal","status":"aberto","dataAbertura":"03/01/2026","horaAbertura":"09:00","dataConclusao":"30/04/2026","rotulos":["Jurídico"]},{"msTaskId":1158,"titulo":"Programa de Reconhecimento","descricao":"1) Definir quantidade de Destaques x Quantidade de Colaboradores 2) Quem decide é o Comite (a definir) 3) O que é o Premio? 4) Quem vai entregar? Diretoria (café)\n\nCHECKLIST:\n- Apresentar Diretoria - 12/12\n- Montar Apresentação - 20/02\n- Estruturação 2 round - 17/02\n- Estruturar melhor - 10/12","setor":"Karine- RH","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"30/11/2025","horaAbertura":"09:00","dataConclusao":"30/04/2026","rotulos":["RH"]},{"msTaskId":1168,"titulo":"Processo Somar Brasil","descricao":"CHECKLIST:\n- Aguardando Retirada do Equip\n- Aguardar Audiencia Instrução -  ?\n- Arrolar Testemunhas - 18/03\n- Montar Defesa - 10/12\n- Analisar Orçamento Sabrina - 28/11","setor":"Jurídico","solicitante":"João Thomé","prioridade":"Baixa","status":"aberto","dataAbertura":"03/01/2026","horaAbertura":"09:00","dataConclusao":"31/08/2026","rotulos":["Jurídico"]},{"msTaskId":1169,"titulo":"Maquina Suco Refeitório","descricao":"—","setor":"Jonathan Thomé","solicitante":"Jonathan Thomé","prioridade":"Normal","status":"aberto","dataAbertura":"29/07/2026","horaAbertura":"00:00","dataConclusao":null,"rotulos":[]},{"msTaskId":1194,"titulo":"Preventiva Elevador","descricao":"Chamar em Março alguém p fazer preventiva do elevador (ART)","setor":"Miguel - Predial","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"29/07/2026","horaAbertura":"00:00","dataConclusao":null,"rotulos":["Manut. Predial"]},{"msTaskId":1202,"titulo":"Fossa Anel","descricao":"Ricardo quer tirar quando formos mexer na bacia de contenção, aproveitar retroescavadeira","setor":"Miguel - Predial","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"29/07/2026","horaAbertura":"00:00","dataConclusao":null,"rotulos":[]},{"msTaskId":1234,"titulo":"Projeto Padrinhos","descricao":"Iniciar pela Produção\n\nCHECKLIST:\n- Criar Pesquisa Satisfação - ?\n- Primeiros Padrinhos -\n- Inicio - Segunda 24/02","setor":"Karine- RH","solicitante":"João Thomé","prioridade":"Normal","status":"aberto","dataAbertura":"03/01/2026","horaAbertura":"09:00","dataConclusao":"30/04/2026","rotulos":["RH"]},{"msTaskId":1241,"titulo":"Ordem de Serviço","descricao":"CHECKLIST:\n- Como está o andamento?","setor":"Janaina TST","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"13/01/2026","horaAbertura":"09:00","dataConclusao":"17/04/2026","rotulos":["RH","TST"]},{"msTaskId":1254,"titulo":"Equipamentos Receitaria","descricao":"Diogo: verificar preço Freezer, Forno Giratório,","setor":"Diogo - Comercial","solicitante":"João Thomé","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"30/04/2026","rotulos":["Receitaria"]},{"msTaskId":1280,"titulo":"Organizar cursos NR","descricao":"—","setor":"Janaina TST","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"12/01/2026","horaAbertura":"09:00","dataConclusao":"17/04/2026","rotulos":["TST"]},{"msTaskId":1281,"titulo":"Projeto Rastreabilidade MP","descricao":"CHECKLIST:\n- Parametrizar Sistema - ?\n- Contagem - 21/06\n\nProgresso no Planner anterior: 2%","setor":"Jonathan Thomé","solicitante":"Jonathan Thomé","prioridade":"Normal","status":"andamento","dataAbertura":"03/01/2026","horaAbertura":"09:00","dataConclusao":"30/04/2026","rotulos":["Produção","Estratégico"]},{"msTaskId":1332,"titulo":"Criar Pão de Queijo (Linha B)","descricao":"Pão\nde Queijo Linha B: último teste 10/03. Fazer novo teste Original 3 x 5 c/ menos\nsal Custo girava em 5,10\n\nCHECKLIST:\n- Teste 12/03\n- Teste 10/03\n- Essência de Queijo Parmesão: Testar na Linha B + Linha Premium\n- Teste c/ Parmesão e Creme de Queijo\n- Teste c/ Mussarela e Creme de Queijo\n- 2) Tentar baixar custo\n- 1) Tentar diluir a essencia\n\nProgresso no Planner anterior: 24%","setor":"Gabriela Kerpel - Produção","solicitante":"João Thomé","prioridade":"Normal","status":"andamento","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"22/04/2026","rotulos":["Produção","Desenv. Receita"]},{"msTaskId":1335,"titulo":"Criação Rolo Pastel (?)","descricao":"Montar proposta p vendermos Caseiro a R$ 3,00 unid. Pezzi está fazendo, usando as sobras deles. Eles querem o rolo (resfriado). Podemos transportador no nosso caminhão.","setor":"Tarefas João Thomé","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"29/07/2026","horaAbertura":"00:00","dataConclusao":null,"rotulos":[]},{"msTaskId":1346,"titulo":"Documentação Alçadas Financeiro","descricao":"—","setor":"Tarefas João Thomé","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"29/07/2026","horaAbertura":"00:00","dataConclusao":null,"rotulos":[]},{"msTaskId":1350,"titulo":"Caso Fabiano (Recurso)","descricao":"26/05/2025 Em Sentença, a Juíza concedeu deferimento da multa e\ninvalidação do regime compensatório. A reclamada recorreu da sentença.\n\nCHECKLIST:\n- Aguardar Sentença Recurso - ?\n- Recorrer Processo - 29/05","setor":"Jurídico","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"03/01/2026","horaAbertura":"09:00","dataConclusao":"30/06/2026","rotulos":["Jurídico"]},{"msTaskId":1363,"titulo":"Escritório Entrando Agua","descricao":"Arrumar quando formos trocar Transformador","setor":"Miguel - Predial","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"29/07/2026","horaAbertura":"00:00","dataConclusao":null,"rotulos":["Manut. Predial"]},{"msTaskId":1391,"titulo":"Resposta Auditor do Trabalho","descricao":"Prazo Máximo: 12/07. - Auditor Fiscal do Trabalho: Alina, responder até 12/07. Verificar com Aghata ou Cintia\n\nCHECKLIST:\n- Prazo p enviar Info faltante - ?\n- Resposta 12/07","setor":"Tarefas João Thomé","solicitante":"João Thomé","prioridade":"Normal","status":"aberto","dataAbertura":"17/01/2026","horaAbertura":"09:00","dataConclusao":"31/07/2026","rotulos":["TST","DP"]},{"msTaskId":1418,"titulo":"Armário Cintia (?)","descricao":"—","setor":"Jonathan Thomé","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"29/07/2026","horaAbertura":"00:00","dataConclusao":null,"rotulos":[]},{"msTaskId":1420,"titulo":"Projeto Camara Fria","descricao":"—","setor":"Ricardo","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"26/06/2026","rotulos":["Produção","Estratégico"]},{"msTaskId":1430,"titulo":"Kit Confeitaria Inara","descricao":"Sala Ajustes Botar a mesa em local bom Balança Cadeira Estante Instalar tomada\n\nCHECKLIST:\n- Arrumar Acrilico - 05/01\n- Startar Projeto - ?\n- Comprar Ar - 02/12\n\nProgresso no Planner anterior: 22%","setor":"Jonathan Thomé","solicitante":"Jonathan Thomé, João Thomé","prioridade":"Normal","status":"andamento","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"01/05/2026","rotulos":["Produção","Estratégico"]},{"msTaskId":1434,"titulo":"Caso Jeferson Coelho","descricao":"CHECKLIST:\n- Audiencia Telepresencial 07/07/26 09:40h","setor":"Jurídico","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"03/01/2026","horaAbertura":"09:00","dataConclusao":"18/08/2026","rotulos":["Jurídico"]},{"msTaskId":1440,"titulo":"Arquivamento Certificados","descricao":"Onde está guardado os certificados? vamos scanear","setor":"Janaina TST","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"12/01/2026","horaAbertura":"09:00","dataConclusao":"17/04/2026","rotulos":["TST"]},{"msTaskId":1448,"titulo":"Alelo Aumento Critérios","descricao":"—","setor":"Karine- RH","solicitante":"João Thomé","prioridade":"Normal","status":"aberto","dataAbertura":"15/01/2026","horaAbertura":"09:00","dataConclusao":"14/05/2026","rotulos":["RH","Diretoria","Estratégico"]},{"msTaskId":1461,"titulo":"Sitrad nos Freezers Conf","descricao":"—","setor":"Jonathan Thomé","solicitante":"Jonathan Thomé","prioridade":"Alta","status":"aberto","dataAbertura":"07/01/2026","horaAbertura":"09:00","dataConclusao":"30/04/2026","rotulos":["Produção","Estratégico"]},{"msTaskId":1463,"titulo":"Demissão Carlos? (Revisão)","descricao":"- Testar/Treinar Aldo, e posteriormente, desligar Carlos.","setor":"Thiago - Logística","solicitante":"João Thomé","prioridade":"Alta","status":"aberto","dataAbertura":"06/01/2026","horaAbertura":"09:00","dataConclusao":"31/05/2026","rotulos":["DP","Logistica"]},{"msTaskId":1475,"titulo":"Sitrad Caminhão Ligado Luz","descricao":"Tentar marcar no Sitrad os caminhões ligado na luz","setor":"Jonathan Thomé","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"07/01/2026","horaAbertura":"09:00","dataConclusao":"30/04/2026","rotulos":["Logistica","Estratégico"]},{"msTaskId":1491,"titulo":"Atualizar Receitas","descricao":"CHECKLIST:\n- Recheio Confeitaria -\n- Massas Confeitaria","setor":"Gabriela Kerpel - Produção","solicitante":"João Thomé","prioridade":"Normal","status":"aberto","dataAbertura":"12/01/2026","horaAbertura":"09:00","dataConclusao":"30/04/2026","rotulos":["Produção"]},{"msTaskId":1496,"titulo":"Definir Operador GA 11 Vias","descricao":"—","setor":"Jonathan Thomé","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"30/04/2026","rotulos":["Produção"]},{"msTaskId":1523,"titulo":"Projeto Reforma Banheiro","descricao":"—","setor":"Estética Voox 1956","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"01/05/2026","horaAbertura":"09:00","dataConclusao":"01/06/2026","rotulos":["Voox 1956"]},{"msTaskId":1529,"titulo":"OnBoarding Criação","descricao":"Apresentar ideia","setor":"Karine- RH","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"09/01/2026","horaAbertura":"09:00","dataConclusao":"30/04/2026","rotulos":["RH"]},{"msTaskId":1534,"titulo":"Processo Thomas (Sentença)","descricao":"Reclamante trabalhou de 17/06/2024 até 14/09/2025 como Auxiliar\nde Produção.\n\nCHECKLIST:\n- Sentença\n- Audiência Tele - 12/03 09:00h\n- Pericia Periculosidade - 21/01 10h\n- Audiencia Conciliação Terça 18/11 13h","setor":"Jurídico","solicitante":"João Thomé","prioridade":"Normal","status":"aberto","dataAbertura":"03/01/2026","horaAbertura":"09:00","dataConclusao":"30/06/2026","rotulos":["Jurídico"]},{"msTaskId":1535,"titulo":"Processo Sarah Cristina (Sentença)","descricao":"Auxiliar de Cozinha, trabalhou de 14/04/2025 a 12/09/2025. Sarah\npediu demissão e ficou indignada porque recebeu pouco na rescisão. Trabalhou 3\nmeses na Cozinha, movimento estava fraco e foi oferecido vaga na Confeitaria, e\nela aceitou.\n\nCHECKLIST:\n- Aguardando Sentença\n- Audiencia Una Terça 02/12 15h Telepresencial","setor":"Jurídico","solicitante":"João Thomé","prioridade":"Normal","status":"aberto","dataAbertura":"03/01/2026","horaAbertura":"09:00","dataConclusao":"30/06/2026","rotulos":["Jurídico"]},{"msTaskId":1566,"titulo":"Calendário de Treinamentos Setores","descricao":"CHECKLIST:\n- Retorno Treinamentos - ?\n- Reunião Inicial - 29/10","setor":"Karine- RH","solicitante":"João Thomé","prioridade":"Normal","status":"aberto","dataAbertura":"06/01/2026","horaAbertura":"09:00","dataConclusao":"01/05/2026","rotulos":["RH","TST","Estratégico"]},{"msTaskId":1580,"titulo":"Bomen Empresa Inteligência","descricao":"Cobrança Clientes","setor":"Simone Thomé - Financeiro","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"27/01/2026","horaAbertura":"09:00","dataConclusao":"30/04/2026","rotulos":[]},{"msTaskId":1588,"titulo":"Reunião Comercial Téc. Panif","descricao":"Reunião última semana mês","setor":"Diogo - Comercial","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"08/01/2026","horaAbertura":"09:00","dataConclusao":"30/04/2026","rotulos":["Comercial","Estratégico"]},{"msTaskId":1590,"titulo":"Compra Novo Caminhão","descricao":"CHECKLIST:\n- Diogo investigar Foton - ?\n- Avaliação Gilberto: 27/11\n- Avaliação Iveco: 24/11 (Falta valores)\n- Comprar um Toco ?\n- Trocar Báu IWE e IVZ ?","setor":"Ricardo","solicitante":"João Thomé","prioridade":"Alta","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"01/05/2026","rotulos":["Logistica"]},{"msTaskId":1591,"titulo":"Reduzir Requeijão Recheios?","descricao":"Recheio de Calabresa e Presunto","setor":"Gabriela Kerpel - Produção","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"12/01/2026","horaAbertura":"09:00","dataConclusao":"17/04/2026","rotulos":["Produção"]},{"msTaskId":1595,"titulo":"Processo Erica Gislaine (Sentença)","descricao":"CHECKLIST:\n- Sentença\n- Audiencia Instrução 25/02/26 as 09h TelePresencial","setor":"Jurídico","solicitante":"João Thomé","prioridade":"Normal","status":"aberto","dataAbertura":"07/01/2026","horaAbertura":"09:00","dataConclusao":"30/04/2026","rotulos":["Jurídico"]},{"msTaskId":1596,"titulo":"Carrinho p Gelo Quadra","descricao":"CHECKLIST:\n- Entrega - Semana 24/11\n\nProgresso no Planner anterior: 50%","setor":"Miguel - Predial","solicitante":"Não atribuído","prioridade":"Normal","status":"andamento","dataAbertura":"16/11/2029","horaAbertura":"09:00","dataConclusao":"16/11/2029","rotulos":["Produção"]},{"msTaskId":1598,"titulo":"Estoque de Pneu","descricao":"—","setor":"Thiago - Logística","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"08/01/2026","horaAbertura":"09:00","dataConclusao":"31/05/2026","rotulos":["Logistica"]},{"msTaskId":1614,"titulo":"Checklist Diário Veículo (Leve)","descricao":"—","setor":"Thiago - Logística","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"06/01/2026","horaAbertura":"09:00","dataConclusao":"31/05/2026","rotulos":["Logistica"]},{"msTaskId":1615,"titulo":"Checklist Veículo SEMANAL (Caminhões)","descricao":"—","setor":"Tarefas Thiago","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"06/01/2026","horaAbertura":"09:00","dataConclusao":"30/04/2026","rotulos":["Logistica"]},{"msTaskId":1638,"titulo":"Leitura Dmae (dia 08)","descricao":"Média deve ser 10-11m³ por dia. Avaliar p ficar sempre entre 215-230m³/mês. Última leitura em 17/10.","setor":"Lembretes","solicitante":"João Thomé","prioridade":"Normal","status":"aberto","dataAbertura":"29/07/2026","horaAbertura":"00:00","dataConclusao":null,"rotulos":["Estratégico"]},{"msTaskId":1646,"titulo":"Estruturar Comissões","descricao":"Vendedores, Representantes e fazer zoneamento %%\n\nProgresso no Planner anterior: 8%","setor":"Diogo - Comercial","solicitante":"Não atribuído","prioridade":"Alta","status":"andamento","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"18/05/2026","rotulos":[]},{"msTaskId":1650,"titulo":"Molde Mini Empanadinha","descricao":"CHECKLIST:\n- Maicon Teste - ?\n- Maicon Teste 21/01 - Tamanho aprovado, ajustar massa\n\nProgresso no Planner anterior: 10%","setor":"Gabriela Kerpel - Produção","solicitante":"Não atribuído","prioridade":"Normal","status":"andamento","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"17/04/2026","rotulos":["Estratégico","Produção"]},{"msTaskId":1654,"titulo":"Controle de Contratos Ativos","descricao":"Criação de Controle de Contratos Ativos e, prazo de renovação ou rescisão\n\nProgresso no Planner anterior: 4%","setor":"Simone Thomé - Financeiro","solicitante":"Não atribuído","prioridade":"Normal","status":"andamento","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"11/05/2026","rotulos":["Financeiro","Estratégico"]},{"msTaskId":1660,"titulo":"Embalagens Coloridas","descricao":"CHECKLIST:\n- 32x46 - Amarela\n- 32x46 - Laranja\n- 31x31 - Amarela\n- 32x46 - Azul\n- 32x46 - Amarela\n- 21x30 - Laranja\n- 21x30 - Azul\n- 21x30 - Amarela","setor":"Jonathan Thomé","solicitante":"João Thomé","prioridade":"Alta","status":"aberto","dataAbertura":"26/01/2026","horaAbertura":"09:00","dataConclusao":"21/07/2026","rotulos":["Estratégico","Produção"]},{"msTaskId":1661,"titulo":"Levantamento Preços PQ Praticado Rua","descricao":"—","setor":"Diogo - Comercial","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"30/04/2026","rotulos":["Estratégico","Comercial"]},{"msTaskId":1663,"titulo":"Receitaria Plástico","descricao":"Ricardo pediu p esperar mais 15 dias ver se o preço baixa (16/04)\n\nCHECKLIST:\n- Arte Aprovação\n- Atualizar Receita - Gabi\n- Validar Modelo Impresso\n- Criar Código de Barrab (26/01)","setor":"Tarefas João Thomé","solicitante":"João Thomé","prioridade":"Urgente","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"31/08/2026","rotulos":["Estratégico","Receitaria"]},{"msTaskId":1665,"titulo":"Férias Pgto Ex-Func","descricao":"—","setor":"Cíntia - DP","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"17/04/2026","rotulos":["Financeiro","DP"]},{"msTaskId":1675,"titulo":"Laudo de Shelf-Life","descricao":"Fazer pelo menos o da Receitaria","setor":"Gabriela Kerpel - Produção","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"01/05/2026","horaAbertura":"09:00","dataConclusao":"01/05/2026","rotulos":["Receitaria","Produção"]},{"msTaskId":1678,"titulo":"Reunião Setores","descricao":"—","setor":"Estética Voox 1956","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"04/08/2026","rotulos":["Voox 1956"]},{"msTaskId":1680,"titulo":"Recheio Calab/Pres. Vazando","descricao":"—","setor":"Gabriela Kerpel - Produção","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"17/04/2026","rotulos":["Produção","Desenv. Receita"]},{"msTaskId":1681,"titulo":"Criar Placa Calibragem","descricao":"—","setor":"Thiago - Logística","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"31/05/2026","rotulos":["Logistica"]},{"msTaskId":1683,"titulo":"Outro Operador (Rogério)","descricao":"Progresso no Planner anterior: 24%","setor":"Jonathan Thomé","solicitante":"Não atribuído","prioridade":"Normal","status":"andamento","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"20/04/2026","rotulos":[]},{"msTaskId":1684,"titulo":"Adesivo botar no bau de frente","descricao":"—","setor":"Simone Thomé - Financeiro","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"29/07/2026","horaAbertura":"00:00","dataConclusao":null,"rotulos":[]},{"msTaskId":1685,"titulo":"Camera pegando entrada + porta Cintia","descricao":"—","setor":"Miguel - Predial","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"29/07/2026","horaAbertura":"00:00","dataConclusao":null,"rotulos":[]},{"msTaskId":1687,"titulo":"Teste PQ Receitaria","descricao":"Fazer Apresentação Total\n\nProgresso no Planner anterior: 50%","setor":"Gabriela Kerpel - Produção","solicitante":"Não atribuído","prioridade":"Normal","status":"andamento","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"17/04/2026","rotulos":["Desenv. Receita"]},{"msTaskId":1688,"titulo":"Compra Máq. Cozinha Conf","descricao":"—","setor":"Gabriela Kerpel - Produção","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"17/04/2026","rotulos":["Desenv. Receita"]},{"msTaskId":1689,"titulo":"Sala Expedição Construir","descricao":"—","setor":"Ricardo","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"01/05/2026","rotulos":["Logistica"]},{"msTaskId":1690,"titulo":"Teste Massa Fritos","descricao":"—","setor":"Gabriela Kerpel - Produção","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"17/04/2026","rotulos":[]},{"msTaskId":1697,"titulo":"Reunião Automação Industrial","descricao":"—","setor":"Jonathan Thomé","solicitante":"João Thomé, Jonathan Thomé","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"20/04/2026","rotulos":["Produção"]},{"msTaskId":1699,"titulo":"Intelbras Catraca","descricao":"Verficiar com Daniel como procedemos\n\nProgresso no Planner anterior: 13%","setor":"Ricardo","solicitante":"João Thomé","prioridade":"Normal","status":"andamento","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"23/07/2026","rotulos":["Estratégico"]},{"msTaskId":1700,"titulo":"Revisar Processo Embalagem","descricao":"—","setor":"Jonathan Thomé","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"29/07/2026","horaAbertura":"00:00","dataConclusao":null,"rotulos":[]},{"msTaskId":1701,"titulo":"Horários Almoço Produção","descricao":"—","setor":"Jonathan Thomé","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"29/07/2026","horaAbertura":"00:00","dataConclusao":null,"rotulos":[]},{"msTaskId":1703,"titulo":"Farinha Revisão Quinta","descricao":"—","setor":"Lembretes","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"29/07/2026","horaAbertura":"00:00","dataConclusao":null,"rotulos":[]},{"msTaskId":1704,"titulo":"Teste Recheios Novos Caseiro","descricao":"cliente de Montenegro quer que a gente faça os recheios que eles vendem atualmente lá","setor":"Gabriela Kerpel - Produção","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"17/04/2026","rotulos":["Desenv. Receita"]},{"msTaskId":1706,"titulo":"Prévia Leonardo e do Bruno Jesus:","descricao":"Progresso no Planner anterior: 19%","setor":"Karine- RH","solicitante":"Não atribuído","prioridade":"Normal","status":"andamento","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"20/05/2026","rotulos":["RH","DP"]},{"msTaskId":1708,"titulo":"Valores Comodato Validar","descricao":"Equipamentos\ne faturamento: o que precisa p cada um. Definir com Ricardo e Diogo","setor":"Ricardo","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"30/04/2026","rotulos":["Comercial","Estratégico"]},{"msTaskId":1709,"titulo":"Enviar Cx Azul Quebrada","descricao":"—","setor":"Jonathan Thomé","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"29/07/2026","horaAbertura":"00:00","dataConclusao":null,"rotulos":["Produção"]},{"msTaskId":1711,"titulo":"Refinar Controle de Caixa Plástica","descricao":"—","setor":"Jonathan Thomé","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"29/07/2026","horaAbertura":"00:00","dataConclusao":null,"rotulos":[]},{"msTaskId":1712,"titulo":"Confirmar Supervisor Gerente","descricao":"—","setor":"Diogo - Comercial","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"29/07/2026","horaAbertura":"00:00","dataConclusao":null,"rotulos":[]},{"msTaskId":1713,"titulo":"Fogão de 1400 de 6 bocas. Refrigerador Industrial?","descricao":"—","setor":"Melhorias - Projetos","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"29/07/2026","horaAbertura":"00:00","dataConclusao":null,"rotulos":["Produção","Melhorias"]},{"msTaskId":1714,"titulo":"Patrick: verificar um jeito de dps de eles baterem, encaixar direitinho no carrinho","descricao":"—","setor":"Melhorias - Projetos","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"29/07/2026","horaAbertura":"00:00","dataConclusao":null,"rotulos":["Produção","Melhorias"]},{"msTaskId":1715,"titulo":"Colocar bebedouro na expedição? (CIPA)","descricao":"—","setor":"Melhorias - Projetos","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"29/07/2026","horaAbertura":"00:00","dataConclusao":null,"rotulos":["Melhorias"]},{"msTaskId":1716,"titulo":"Cotar 2 HR Hyundai","descricao":"170mil cada","setor":"Ricardo","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"15/05/2026","rotulos":["Projetos","Logistica"]},{"msTaskId":1717,"titulo":"Banheiro Manutenção","descricao":"—","setor":"Ricardo","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"29/07/2026","horaAbertura":"00:00","dataConclusao":null,"rotulos":[]},{"msTaskId":1720,"titulo":"Projeto Sala Karine Divisão","descricao":"—","setor":"Tarefas João Thomé","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"24/07/2026","rotulos":[]},{"msTaskId":1727,"titulo":"Problema Pressão Gás","descricao":"—","setor":"Ricardo","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"18/05/2026","rotulos":[]},{"msTaskId":1729,"titulo":"Promoção Marcos","descricao":"—","setor":"Anderson - Oficina","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"31/08/2026","rotulos":["Manutenção"]},{"msTaskId":1732,"titulo":"Teste Mini Pastel (Massa Caseiro)","descricao":"—","setor":"Gabriela Kerpel - Produção","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"28/05/2026","rotulos":[]},{"msTaskId":1734,"titulo":"Bess Weg Compra","descricao":"Aguardando Jurídico da Livoltek","setor":"Tarefas João Thomé","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"21/07/2026","rotulos":["Estratégico"]},{"msTaskId":1736,"titulo":"Quadro de Lotação","descricao":"—","setor":"Karine- RH","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"29/07/2026","horaAbertura":"00:00","dataConclusao":null,"rotulos":[]},{"msTaskId":1737,"titulo":"Baixar Custo - Rech. Carne Panela","descricao":"—","setor":"Gabriela Kerpel - Produção","solicitante":"Não atribuído","prioridade":"Normal","status":"aberto","dataAbertura":"02/01/2026","horaAbertura":"09:00","dataConclusao":"06/07/2026","rotulos":[]}],"setores":["Anderson - Oficina","Cíntia - DP","Diogo - Comercial","Estética Voox 1956","Gabriela Kerpel - Produção","Janaina TST","Jonathan Thomé","Jurídico","Karine- RH","Lembretes","Melhorias - Projetos","Miguel - Predial","Ricardo","Simone Thomé - Financeiro","Tarefas João Thomé","Tarefas Thiago","Thiago - Logística"],"responsaveis":["Jonathan Thomé","João Thomé"],"rotulos":[{"nome":"Comercial","cor":"#6366f1"},{"nome":"DP","cor":"#64748b"},{"nome":"Desenv. Receita","cor":"#f5b013"},{"nome":"Diretoria","cor":"#7c3aed"},{"nome":"Estratégico","cor":"#F26B1F"},{"nome":"Financeiro","cor":"#10b981"},{"nome":"Jurídico","cor":"#8B6BB8"},{"nome":"Logistica","cor":"#5b8def"},{"nome":"Manut. Predial","cor":"#a1724a"},{"nome":"Manutenção","cor":"#8a7a5f"},{"nome":"Melhorias","cor":"#84cc16"},{"nome":"Produção","cor":"#2fae7d"},{"nome":"Projetos","cor":"#17a2b8"},{"nome":"RH","cor":"#d6739c"},{"nome":"Receitaria","cor":"#fb7185"},{"nome":"TST","cor":"#f26a6a"},{"nome":"Voox 1956","cor":"#B07D4C"}]};
+
+const app = initializeApp({
+  apiKey: "AIzaSyCH_t074MvkJn-qVMvCtLfEMaQHf_e_d7M",
+  authDomain: "manutencao-comodato.firebaseapp.com",
+  projectId: "manutencao-comodato"
+});
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const $ = id => document.getElementById(id);
+function log(msg, cls) {
+  const el = $('log');
+  el.innerHTML += '<span class="' + (cls || '') + '">' + msg + '</span>\n';
+  el.scrollTop = el.scrollHeight;
+}
+
+/* ---------- login (mesma allowlist do painel) ---------- */
+async function entrar() {
+  const e = $('email').value.trim(), s = $('senha').value.trim();
+  $('erroLogin').textContent = '';
+  if (!e || !s) { $('erroLogin').textContent = 'Preencha e-mail e senha'; return; }
+  $('btnLogin').disabled = true;
+  try {
+    await signInWithEmailAndPassword(auth, e, s);
+  } catch (err) {
+    console.log('Erro de login:', err.code, err.message);
+    $('erroLogin').textContent = err.code || 'Erro ao entrar';
+    $('btnLogin').disabled = false;
+  }
+}
+$('btnLogin').addEventListener('click', entrar);
+$('senha').addEventListener('keydown', ev => { if (ev.key === 'Enter') entrar(); });
+$('email').addEventListener('keydown', ev => { if (ev.key === 'Enter') entrar(); });
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) { $('cardLogin').classList.remove('hide'); $('app').classList.add('hide'); return; }
+  let ok = false, nome = '';
+  try {
+    const us = await getDoc(doc(db, 'usuarios', user.uid));
+    ok = us.exists() && us.data().ativo === true;
+    nome = (us.exists() && us.data().nome) || user.email;
+  } catch (err) { console.log('Erro allowlist:', err); }
+  if (!ok) {
+    $('erroLogin').textContent = 'Sem acesso: ' + (user.email || '');
+    $('btnLogin').disabled = false;
+    try { await signOut(auth); } catch (e) {}
+    return;
+  }
+  $('cardLogin').classList.add('hide');
+  $('app').classList.remove('hide');
+  log('Conectado como ' + nome, 'ok');
+  montarPreview();
+});
+
+/* ---------- prévia ---------- */
+function corTexto(hex) {
+  hex = (hex || '').replace('#', '');
+  const r = parseInt(hex.substr(0,2),16)||0, g = parseInt(hex.substr(2,2),16)||0, b = parseInt(hex.substr(4,2),16)||0;
+  return (r*299 + g*587 + b*114)/1000 >= 140 ? '#111' : '#fff';
+}
+function corRotulo(n) {
+  const r = DADOS.rotulos.find(x => x.nome === n);
+  return r ? r.cor : '#8a91a3';
+}
+function montarPreview() {
+  const t = DADOS.tarefas;
+  $('nTot').textContent = t.length;
+  $('nAb').textContent  = t.filter(x => x.status === 'aberto').length;
+  $('nAnd').textContent = t.filter(x => x.status === 'andamento').length;
+  $('nSet').textContent = DADOS.setores.length;
+  $('nRot').textContent = DADOS.rotulos.length;
+
+  $('chSet').innerHTML = DADOS.setores
+    .map(s => '<span class="chip chip-s">' + s + '</span>').join('');
+  $('chRot').innerHTML = DADOS.rotulos
+    .map(r => '<span class="chip" style="background:' + r.cor + ';color:' + corTexto(r.cor) + '">' + r.nome + '</span>').join('');
+
+  $('tb').innerHTML = t.map(x =>
+    '<tr>' +
+    '<td class="mu">' + x.msTaskId + '</td>' +
+    '<td>' + x.titulo + '</td>' +
+    '<td class="st">' + x.setor + '</td>' +
+    '<td class="st">' + x.solicitante + '</td>' +
+    '<td class="st">' + (x.dataConclusao || '<span class="mu">sem prazo</span>') + '</td>' +
+    '<td><span class="pr ' + x.prioridade + '">' + x.prioridade.toUpperCase() + '</span></td>' +
+    '<td class="st">' + (x.status === 'aberto' ? 'aberto' : 'andamento') + '</td>' +
+    '<td>' + x.rotulos.map(n => '<span class="chip" style="background:' + corRotulo(n) + ';color:' + corTexto(corRotulo(n)) + '">' + n + '</span>').join(' ') + '</td>' +
+    '</tr>').join('');
+}
+
+/* ---------- checar duplicidade ---------- */
+async function jaImportados() {
+  const snap = await getDocs(collection(db, 'planner'));
+  const ids = new Set();
+  let total = 0;
+  snap.forEach(d => {
+    if (d.id === '_config') return;
+    total++;
+    const v = d.data().msTaskId;
+    if (v !== undefined && v !== null) ids.add(Number(v));
+  });
+  return { ids, total };
+}
+
+$('btnDry').addEventListener('click', async () => {
+  $('btnDry').disabled = true;
+  try {
+    const { ids, total } = await jaImportados();
+    const novas = DADOS.tarefas.filter(t => !ids.has(t.msTaskId));
+    log('Coleção planner tem ' + total + ' tarefa(s); ' + ids.size + ' com msTaskId.', 'mu');
+    log('Seriam criadas ' + novas.length + ' · puladas ' + (DADOS.tarefas.length - novas.length) + '.',
+        novas.length ? 'wr' : 'ok');
+  } catch (err) {
+    log('ERRO ao ler a coleção: ' + (err.code || err.message), 'er');
+    console.log('Erro getDocs:', err);
+  }
+  $('btnDry').disabled = false;
+});
+
+/* ---------- config: acrescenta sem apagar ---------- */
+const norm = s => (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ').trim();
+
+async function atualizarConfig() {
+  let cfg = {};
+  try {
+    const d = await getDoc(doc(db, 'planner', '_config'));
+    if (d.exists()) cfg = d.data();
+  } catch (err) { log('Aviso: não li _config (' + (err.code||err.message) + '), vou criar.', 'wr'); }
+
+  const setores = Array.isArray(cfg.setores) ? cfg.setores.slice() : [];
+  const resp    = Array.isArray(cfg.responsaveis) ? cfg.responsaveis.slice() : [];
+  const rot     = Array.isArray(cfg.rotulos) ? cfg.rotulos.slice() : [];
+  let addS = 0, addR = 0, addL = 0;
+
+  DADOS.setores.forEach(s => {
+    if (!setores.some(x => norm(x) === norm(s))) { setores.push(s); addS++; }
+  });
+  DADOS.responsaveis.forEach(n => {
+    if (!resp.some(x => norm(x) === norm(n))) { resp.push(n); addR++; }
+  });
+  DADOS.rotulos.forEach(r => {
+    if (!rot.some(x => norm(x.nome) === norm(r.nome))) { rot.push(r); addL++; }
+  });
+
+  await setDoc(doc(db, 'planner', '_config'),
+    { setores, responsaveis: resp, rotulos: rot, __config: true }, { merge: true });
+
+  log('_config atualizado: +' + addS + ' setor(es), +' + addR + ' responsável(is), +' + addL + ' rótulo(s).', 'ok');
+}
+
+/* ---------- importar ---------- */
+$('btnImp').addEventListener('click', async () => {
+  if (!confirm('Importar ' + DADOS.tarefas.length + ' tarefas para o Planner?')) return;
+  $('btnImp').disabled = true; $('btnDry').disabled = true;
+  $('log').innerHTML = '';
+
+  try {
+    log('Lendo o que já existe…', 'mu');
+    const { ids } = await jaImportados();
+    const fila = DADOS.tarefas.filter(t => !ids.has(t.msTaskId));
+    const pulos = DADOS.tarefas.length - fila.length;
+    if (pulos) log(pulos + ' já estavam importadas — puladas.', 'wr');
+    if (!fila.length) { log('Nada novo para importar.', 'ok'); $('btnImp').disabled = false; $('btnDry').disabled = false; return; }
+
+    await atualizarConfig();
+
+    log('Gravando ' + fila.length + ' tarefa(s)…', 'mu');
+    let feitas = 0, falhas = 0;
+    for (const t of fila) {
+      const docNovo = {
+        titulo: t.titulo,
+        descricao: t.descricao,
+        setor: t.setor,
+        solicitante: t.solicitante,
+        prioridade: t.prioridade,
+        status: t.status,
+        origem: 'importacao_planner_ms',
+        dataAbertura: t.dataAbertura,
+        horaAbertura: t.horaAbertura,
+        rotulos: t.rotulos,
+        fotos: [],
+        msTaskId: t.msTaskId,
+        historico: [{
+          data: t.dataAbertura,
+          hora: t.horaAbertura,
+          acao: 'Importada do Microsoft Planner (tarefa #' + t.msTaskId + ')',
+          obs: 'Direção Mc Copy · exportação de 29/07/2026'
+        }]
+      };
+      if (t.dataConclusao) docNovo.dataConclusao = t.dataConclusao;
+
+      try {
+        await addDoc(collection(db, 'planner'), docNovo);
+        feitas++;
+      } catch (err) {
+        falhas++;
+        log('FALHOU #' + t.msTaskId + ' "' + t.titulo + '": ' + (err.code || err.message), 'er');
+        console.log('Erro addDoc:', t.msTaskId, err);
+      }
+      $('bar').style.width = Math.round((feitas + falhas) / fila.length * 100) + '%';
+      if ((feitas + falhas) % 10 === 0) log('  … ' + (feitas + falhas) + '/' + fila.length, 'mu');
+    }
+
+    log('');
+    log('CONCLUÍDO — ' + feitas + ' criada(s)' + (falhas ? ', ' + falhas + ' com erro' : '') + '.', falhas ? 'wr' : 'ok');
+    log('Abra o Planner e dê refresh; o onSnapshot já deve mostrar tudo.', 'mu');
+  } catch (err) {
+    log('ERRO GERAL: ' + (err.code || err.message), 'er');
+    console.log('Erro import:', err);
+  }
+  $('btnImp').disabled = false; $('btnDry').disabled = false;
+});
+</script>
+</body>
+</html>
