@@ -826,9 +826,6 @@ header {
   padding: 16px 22px;
   border-bottom: 1px solid var(--line);
   background: var(--bg);
-  position: sticky;
-  top: 0;
-  z-index: 40;
 }
 .kanban-title-row {
   display: flex;
@@ -887,7 +884,7 @@ header {
   gap: 14px;
   padding: 18px 22px 32px;
   overflow-x: auto;
-  min-height: calc(100vh - 280px);
+  min-height: calc(100vh - 340px);
 }
 
 .kanban-col {
@@ -896,7 +893,7 @@ header {
   display: flex;
   flex-direction: column;
   min-width: 280px;
-  max-height: calc(100vh - 280px);
+  max-height: calc(100vh - 340px);
 }
 
 .kanban-col-head {
@@ -1069,7 +1066,7 @@ header {
   }
   .kanban-col {
     scroll-snap-align: start;
-    max-height: calc(100vh - 280px);
+    max-height: calc(100vh - 360px);
   }
 }
 
@@ -1514,14 +1511,12 @@ header {
 
 body.agenda-mode .home-view { display: none; }
 body.agenda-mode .kanban-view { display: none; }
+body.agenda-mode #sharedFilters { display: none; }
 
 .agenda-toolbar {
   padding: 16px 22px;
   border-bottom: 1px solid var(--line);
   background: var(--bg);
-  position: sticky;
-  top: 0;
-  z-index: 40;
 }
 .agenda-title-row {
   display: flex;
@@ -2134,7 +2129,6 @@ body.agenda-mode .kanban-view { display: none; }
 
 
 <main>
-  <section class="home-view" id="homeView">
   <header>
     <div class="header-stripe"></div>
     <div class="header-main">
@@ -2158,6 +2152,7 @@ body.agenda-mode .kanban-view { display: none; }
   </header>
 
 
+  <div id="sharedFilters">
   <div style="padding: 10px 22px 0; border-bottom: 1px solid var(--line);">
     <div style="position: relative; max-width: 340px;">
       <input type="text" id="searchInput" placeholder="Filtrar por palavra-chave" style="width: 100%; background: var(--bg-2); border: 1px solid var(--line-2); color: var(--ink); padding: 8px 12px 8px 32px; font-family: var(--sans); font-size: 12px; border-radius: 8px; outline: none;">
@@ -2169,10 +2164,9 @@ body.agenda-mode .kanban-view { display: none; }
     <label class="filter-sel-wrap"><span class="filter-sel-label">Setor</span><select id="fSetor" class="filter-select"><option value="">Todos os setores</option></select></label>
     <label class="filter-sel-wrap"><span class="filter-sel-label">Prazo</span><select id="fPrazo" class="filter-select"><option value="all">Todos</option><option value="hoje">Hoje</option><option value="amanha">Amanhã</option><option value="semana">Esta semana</option><option value="mes">Este mês</option><option value="atrasadas">Atrasadas</option></select></label>
   </div>
+  </div><!-- /#sharedFilters -->
 
-  
-  <!-- filtro de prazo agora é dropdown (#fPrazo) na barra de seletores -->
-
+  <section class="home-view" id="homeView">
   <div class="orders" id="ordersList"></div>
   </section>
 
@@ -2183,38 +2177,6 @@ body.agenda-mode .kanban-view { display: none; }
         <div class="kanban-title">Quadro Kanban</div>
         <div class="kanban-title-meta" id="kanbanMeta">— demandas</div>
       </div>
-      <div class="kanban-search-row">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-        <input type="text" id="kanbanSearch" placeholder="Buscar no quadro...">
-      </div>
-      <div class="kanban-bucket-chips" id="kanbanBucketChips">
-        <button class="chip active" data-kbucket="">Todos</button>
-        <button class="chip" data-kbucket="ADMINISTRATIVO">Administrativo</button>
-        <button class="chip" data-kbucket="CONFEITARIA">Confeitaria</button>
-        <button class="chip" data-kbucket="COZINHA/CONF">Cozinha/Conf</button>
-        <button class="chip" data-kbucket="DIRETORIA">Diretoria</button>
-        <button class="chip" data-kbucket="EMBALAÇÃO">Embalação</button>
-        <button class="chip" data-kbucket="EXPEDIÇÃO">Expedição</button>
-        <button class="chip" data-kbucket="FROTA">Frota</button>
-        <button class="chip" data-kbucket="LIMPEZA">Limpeza</button>
-        <button class="chip" data-kbucket="PANIFICAÇÃO">Panificação</button>
-        <button class="chip" data-kbucket="PREDIAL">Predial</button>
-        <button class="chip" data-kbucket="RECEBIMENTO">Recebimento</button>
-        <button class="chip" data-kbucket="REFEITÓRIO">Refeitório</button>
-        <button class="chip" data-kbucket="OUTRO">Outro</button>
-        <button class="chip" data-kbucket="PROJETOS">Projetos</button>
-        <button class="chip" data-kbucket="TAREFAS MIGUEL">Tarefas Miguel</button>
-      </div>
-      <div style="display: flex; gap: 8px; margin-top: 10px; overflow-x: auto; scrollbar-width: none; align-items: center;">
-        <span class="periodo-label">Prazo</span>
-        <button class="periodo-chip active" data-kperiodo="all">Todos</button>
-        <button class="periodo-chip" data-kperiodo="hoje">Hoje</button>
-        <button class="periodo-chip" data-kperiodo="amanha">Amanhã</button>
-        <button class="periodo-chip" data-kperiodo="semana">Esta semana</button>
-        <button class="periodo-chip" data-kperiodo="mes">Este mês</button>
-        <button class="periodo-chip" data-kperiodo="atrasadas">Atrasadas</button>
-      </div>
-
     </div>
     <div class="kanban-board" id="kanbanBoard"></div>
   </section>
@@ -2253,13 +2215,13 @@ body.agenda-mode .kanban-view { display: none; }
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>
     Início
   </button>
-  <button class="nav-item" id="navAgenda">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="1"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-    Agenda
-  </button>
   <button class="nav-item" id="navKanban">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="5" height="18" rx="0.5"/><rect x="10" y="3" width="5" height="12" rx="0.5"/><rect x="17" y="3" width="4" height="8" rx="0.5"/></svg>
     Kanban
+  </button>
+  <button class="nav-item" id="navAgenda">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="1"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+    Agenda
   </button>
   <button class="nav-item" id="navConfig" onclick="if(window.openConfig)window.openConfig()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
@@ -3710,17 +3672,16 @@ modalDetail.addEventListener('click', (e) => {
 
 
 /* ============ KANBAN ============ */
-const kanbanState = { search: '', bucket: '', shownPerCol: { open: 100, progress: 100, done: 50 }, periodo: 'all', periodoCampo: 'deadline' };
-
+// Kanban usa os MESMOS filtros do cabeçalho (state): busca, setor e prazo.
 function renderKanban() {
-  const q = (kanbanState.search || '').toLowerCase().trim();
+  const q = (state.search || '').toLowerCase().trim();
   const filtered = orders.filter(o => {
     if (q) {
       const hay = (o.title + ' ' + o.local + ' ' + o.assignee + ' ' + o.id + ' ' + (o.desc||'')).toLowerCase();
       if (!hay.includes(q)) return false;
     }
-    if (kanbanState.periodo && kanbanState.periodo !== 'all') {
-      if (!matchPeriodo(o, kanbanState.periodo, kanbanState.periodoCampo)) return false;
+    if (state.periodo && state.periodo !== 'all') {
+      if (!matchPeriodo(o, state.periodo, state.periodoCampo)) return false;
     }
     return true;
   });
@@ -3728,7 +3689,7 @@ function renderKanban() {
   document.getElementById('kanbanMeta').textContent = filtered.length + ' demandas no quadro';
 
   // Colunas = buckets (setores). Filtro de bucket mostra só aquele.
-  const cols = kanbanState.bucket ? [kanbanState.bucket] : SETORES.slice();
+  const cols = state.bucket ? [state.bucket] : SETORES.slice();
   const usados = new Set();
   const porBucket = {};
   cols.forEach(b => {
@@ -3802,95 +3763,13 @@ function renderKanban() {
   });
 }
 
-// Drag & drop nas colunas
-document.querySelectorAll('.kanban-col-body').forEach(body => {
-  body.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    body.closest('.kanban-col').classList.add('drag-over');
-  });
-  body.addEventListener('dragleave', (e) => {
-    if (!body.contains(e.relatedTarget)) {
-      body.closest('.kanban-col').classList.remove('drag-over');
-    }
-  });
-  body.addEventListener('drop', async (e) => {
-    e.preventDefault();
-    body.closest('.kanban-col').classList.remove('drag-over');
-    const id = e.dataTransfer.getData('text/plain');
-    const newStatus = body.dataset.drop;
-    const o = orders.find(x => x.id === id);
-    if (o && o.status !== newStatus) {
-      const oldStatus = o.status;
-      o.status = newStatus;
-      const statusName = { open: 'Em aberto', progress: 'Em execução', done: 'Concluída' }[newStatus];
-      o.timeline.push({
-        time: 'Agora',
-        text: `Status alterado para "${statusName}" via Kanban`
-      });
-      // Sincroniza com Firebase se for de lá
-      if (o.fromFirebase && o.firestoreId) {
-        const fbStatus = { open: 'aberto', progress: 'andamento', done: 'concluido', waiting_part: 'aguardando_peca', waiting_auth: 'aguardando_autorizacao', paused: 'pausada' }[newStatus];
-        try {
-          await updateDoc(doc(db, 'planner', o.firestoreId), { status: fbStatus });
-        } catch (err) {
-          console.error('Erro ao sincronizar:', err);
-        }
-      }
-      renderKanban();
-      render();
-    }
-  });
-});
-
-// Busca kanban
-let kSearchDebounce;
-document.getElementById('kanbanSearch').addEventListener('input', (e) => {
-  clearTimeout(kSearchDebounce);
-  kSearchDebounce = setTimeout(() => {
-    kanbanState.search = e.target.value;
-    kanbanState.shownPerCol = { open: 100, progress: 100, done: 50 };
-    renderKanban();
-  }, 200);
-});
-
-// Bucket chips kanban
-document.querySelectorAll('#kanbanBucketChips .chip').forEach(c => {
-  c.addEventListener('click', () => {
-    document.querySelectorAll('#kanbanBucketChips .chip').forEach(x => x.classList.remove('active'));
-    c.classList.add('active');
-    kanbanState.bucket = c.dataset.kbucket || '';
-    kanbanState.shownPerCol = { open: 100, progress: 100, done: 50 };
-    renderKanban();
-  });
-});
-
 // === Navegação entre views ===
 // switchView consolidada abaixo (suporta home, kanban, agenda)
 
 
 
 
-// === Handlers Período HOME ===
-document.querySelectorAll('#periodoBar .periodo-chip').forEach(c => {
-  c.addEventListener('click', () => {
-    document.querySelectorAll('#periodoBar .periodo-chip').forEach(x => x.classList.remove('active'));
-    c.classList.add('active');
-    state.periodo = c.dataset.periodo;
-    state.shown = 60;
-    render();
-  });
-});
-// === Handlers Período KANBAN ===
-document.querySelectorAll('[data-kperiodo]').forEach(c => {
-  c.addEventListener('click', () => {
-    document.querySelectorAll('[data-kperiodo]').forEach(x => x.classList.remove('active'));
-    c.classList.add('active');
-    kanbanState.periodo = c.dataset.kperiodo;
-    kanbanState.shownPerCol = { open: 100, progress: 100, done: 50 };
-    renderKanban();
-  });
-});
+// (Período agora é o dropdown #fPrazo na barra de filtros compartilhada.)
 
 
 
