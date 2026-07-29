@@ -4429,8 +4429,21 @@ function syncFirebaseOrders() {
     renderKanban();
   }
 }
-// Inicia o listener
-onSnapshot(collection(db, 'planner'), (snap) => {
+// O listener NÃO pode ser assinado na carga do módulo: nessa hora o Firebase Auth
+// ainda não resolveu, o Firestore responde permission-denied e a lista fica vazia
+// para sempre. Quem chama é o onAuthStateChanged, depois da allowlist.
+var _unsubPlanner = null;
+
+window.pararPlannerListener = function () {
+  if (_unsubPlanner) { try { _unsubPlanner(); } catch (e) {} _unsubPlanner = null; }
+  firebaseOrders = [];
+  firstFirebaseLoad = true;
+  knownFirebaseIds = new Set();
+};
+
+window.iniciarPlannerListener = function () {
+  if (_unsubPlanner) return;              // já está ligado, não duplica
+  _unsubPlanner = onSnapshot(collection(db, 'planner'), (snap) => {
   // Config de setores (doc especial _config, não é tarefa)
   var _cfg = snap.docs.find(function(d){ return d.id === '_config'; });
   if (_cfg) {
@@ -4479,7 +4492,24 @@ onSnapshot(collection(db, 'planner'), (snap) => {
   syncFirebaseOrders();
   
   firstFirebaseLoad = false;
-});
+  },
+  // Sem este callback um permission-denied ficava invisível: 0 tarefas e nenhum aviso.
+  (err) => {
+    console.log('Erro no listener planner:', err.code || err.message, err);
+    var l = document.getElementById('ordersList');
+    if (l) {
+      l.innerHTML = '<div class="empty">'
+        + '<div class="empty-icon">!</div>'
+        + '<h3>Não consegui ler as tarefas</h3>'
+        + '<p>' + (err.code || err.message) + '<br><br>'
+        + 'Se diz <b>permission-denied</b>, é regra do Firestore na coleção <b>planner</b>.</p>'
+        + '</div>';
+    }
+    if (typeof mostrarToast === 'function') {
+      mostrarToast('Erro de leitura', 'Não li a coleção planner — ' + (err.code || err.message), '');
+    }
+  });
+};
 
 
 
@@ -4937,6 +4967,7 @@ render();
       loginScreen.style.display = '';
       document.body.style.overflow = 'hidden';
       loginBtn.disabled = false;          // sem isto o botão ficava travado depois do 1º erro
+      if (window.pararPlannerListener) window.pararPlannerListener();
       return;
     }
     let ok = false, dados = null;         // fora do try: antes o 'us' era const dentro do bloco
@@ -4950,12 +4981,15 @@ render();
       loginScreen.style.display = 'none';
       document.body.style.overflow = '';
       loginBtn.disabled = false;
+      // Só agora existe token: é aqui que o listener das tarefas pode subir.
+      if (window.iniciarPlannerListener) window.iniciarPlannerListener();
       try { if (window.setPlannerUser) window.setPlannerUser((dados && dados.nome) || user.displayName || (user.email || '')); } catch (e) {}
     } else {
       loginErro.textContent = 'Sem acesso: ' + (user.email || '');
       loginScreen.style.display = '';
       document.body.style.overflow = 'hidden';
       loginBtn.disabled = false;
+      if (window.pararPlannerListener) window.pararPlannerListener();
       try { await signOut(auth); } catch (e) {}
     }
   });
