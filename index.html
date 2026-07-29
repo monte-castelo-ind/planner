@@ -2098,6 +2098,15 @@ body.agenda-mode #sharedFilters { display: none; }
 .prio-dot{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:middle; }
 .tcell-rot{ display:flex; flex-wrap:wrap; gap:4px; white-space:normal; }
 .rotulo-tag{ display:inline-block; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:600; line-height:1.5; }
+/* ---- cursor de célula e edição rápida (teclado) ---- */
+.cel-sel{ outline:2px solid var(--orange); outline-offset:-2px; border-radius:3px; background:rgba(47,174,125,.08); }
+.cel-edit{ width:100%; background:var(--bg); border:1px solid var(--orange); border-radius:4px; color:var(--ink); font-family:var(--sans); font-size:12px; padding:4px 6px; outline:none; }
+html[data-theme="dark"] .cel-edit{ color-scheme:dark; }
+select.cel-edit{ cursor:pointer; }
+.atalhos-dica{ margin-left:auto; font-family:var(--mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-faint); white-space:nowrap; }
+.atalhos-dica b{ color:var(--ink-mute); font-weight:600; }
+@media (max-width:900px){ .atalhos-dica{ display:none; } }
+
 /* botão de inverter a ordem (ao lado do seletor Ordenar) */
 .ordem-dir{ background:var(--bg-2); border:1px solid var(--line-2); color:var(--ink-mute); border-radius:8px; width:38px; flex:0 0 auto; cursor:pointer; font-size:15px; line-height:1; padding:8px 0; }
 .ordem-dir.ativo{ color:var(--orange); border-color:var(--orange); }
@@ -2239,6 +2248,7 @@ body.agenda-mode #sharedFilters { display: none; }
     <label class="filter-sel-wrap"><span class="filter-sel-label">Setor</span><select id="fSetor" class="filter-select"><option value="">Todos os setores</option></select></label>
     <label class="filter-sel-wrap"><span class="filter-sel-label">Prazo</span><select id="fPrazo" class="filter-select"><option value="all">Todos</option><option value="hoje">Hoje</option><option value="amanha">Amanhã</option><option value="semana">Esta semana</option><option value="mes">Este mês</option><option value="atrasadas">Atrasadas</option></select></label>
     <label class="filter-sel-wrap" id="ordenarWrap"><span class="filter-sel-label">Ordenar</span><select id="fOrdem" class="filter-select"></select><button type="button" id="fOrdemDir" class="ordem-dir" title="Inverter a ordem" aria-label="Inverter a ordem">↑</button></label>
+    <span class="atalhos-dica"><b>↑↓←→</b> navegar · <b>F2</b> editar · <b>Enter</b> abrir · <b>Esc</b> fechar</span>
   </div>
   </div><!-- /#sharedFilters -->
 
@@ -2476,13 +2486,13 @@ let state = { tab: 'all', filter: 'all', bucket: null, search: '', shown: 60, pe
 // ===== Ordenação da tabela =====
 // Fonte única: cabeçalho e ordenação saem daqui, então não podem divergir.
 var COLUNAS = [
-  { key: 'titulo',   label: 'Nome da Tarefa' },
-  { key: 'assignee', label: 'Atribuída a'    },
-  { key: 'inicio',   label: 'Início'         },
-  { key: 'prazo',    label: 'Concluir'       },
-  { key: 'setor',    label: 'Bucket'         },
-  { key: 'prio',     label: 'Prioridade'     },
-  { key: 'rotulos',  label: 'Rótulos'        }
+  { key: 'titulo',   label: 'Nome da Tarefa', edit: 'texto'  },
+  { key: 'assignee', label: 'Atribuída a',    edit: 'lista'  },
+  { key: 'inicio',   label: 'Início',         edit: 'data'   },
+  { key: 'prazo',    label: 'Concluir',       edit: 'data'   },
+  { key: 'setor',    label: 'Bucket',         edit: 'select' },
+  { key: 'prio',     label: 'Prioridade',     edit: 'select' },
+  { key: 'rotulos',  label: 'Rótulos',        edit: 'modal'  }
 ];
 
 function valorColuna(o, key) {
@@ -2498,6 +2508,246 @@ function valorColuna(o, key) {
     return (r === undefined) ? 9 : r;
   }
   return '';
+}
+
+/* ==================================================================
+   ATALHOS DE TECLADO — navegação e edição direto na célula
+   ↑↓←→ move o cursor · F2 edita · Enter abre a tarefa · Esc cancela/fecha
+   ================================================================== */
+var grid = { row: -1, col: -1, editando: false };
+var _edit = null;
+
+function gridLinhas() { return document.querySelectorAll('#ordersList .tbl-row'); }
+
+function aplicarCursor() {
+  document.querySelectorAll('#ordersList .cel-sel').forEach(function (el) { el.classList.remove('cel-sel'); });
+  if (grid.row < 0 || grid.col < 0) return;
+  var linhas = gridLinhas();
+  if (!linhas.length) { grid.row = -1; grid.col = -1; return; }
+  if (grid.row > linhas.length - 1) grid.row = linhas.length - 1;   // a lista pode ter encurtado
+  var cel = linhas[grid.row] && linhas[grid.row].children[grid.col];
+  if (!cel) return;
+  cel.classList.add('cel-sel');
+  cel.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+function ehCampo(t) {
+  return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+}
+function modalAberto() { return document.querySelector('.modal-backdrop.open'); }
+
+document.addEventListener('keydown', function (e) {
+
+  // Esc tem prioridade: cancela edição > fecha modal > limpa cursor
+  if (e.key === 'Escape') {
+    if (grid.editando) { e.preventDefault(); cancelarEdicao(); return; }
+    var m = modalAberto();
+    if (m) { e.preventDefault(); m.classList.remove('open'); return; }
+    if (grid.row >= 0) { e.preventDefault(); grid.row = -1; grid.col = -1; aplicarCursor(); }
+    return;
+  }
+
+  // o resto só vale na lista, fora de campo de texto e sem modal aberto
+  if (ehCampo(e.target) || modalAberto()) return;
+  if (document.body.classList.contains('kanban-mode') || document.body.classList.contains('agenda-mode')) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+  var linhas = gridLinhas();
+  if (!linhas.length) return;
+  var ultCol = COLUNAS.length - 1;
+  var setas = ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'];
+
+  if (setas.indexOf(e.key) >= 0) {
+    e.preventDefault();
+    if (grid.row < 0) { grid.row = 0; grid.col = 0; aplicarCursor(); return; }
+    if (e.key === 'ArrowDown') {
+      // no fim da página carregada, puxa o próximo lote em vez de travar
+      if (grid.row + 1 >= linhas.length && document.getElementById('loadMore')) {
+        state.shown += 60; render(); linhas = gridLinhas();
+      }
+      grid.row = Math.min(grid.row + 1, linhas.length - 1);
+    }
+    else if (e.key === 'ArrowUp')    grid.row = Math.max(grid.row - 1, 0);
+    else if (e.key === 'ArrowRight') grid.col = Math.min(grid.col + 1, ultCol);
+    else if (e.key === 'ArrowLeft')  grid.col = Math.max(grid.col - 1, 0);
+    aplicarCursor();
+    return;
+  }
+
+  if (grid.row < 0) return;
+
+  if (e.key === 'F2') { e.preventDefault(); editarCelula(); return; }
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    var id = linhas[grid.row] && linhas[grid.row].dataset.id;
+    if (id) openDetail(id);
+  }
+});
+
+function editarCelula() {
+  if (grid.editando) return;
+  var linhas = gridLinhas();
+  var linha = linhas[grid.row];
+  var col = COLUNAS[grid.col];
+  if (!linha || !col) return;
+  var cel = linha.children[grid.col];
+  var o = orders.find(function (x) { return x.id === linha.dataset.id; });
+  if (!cel || !o) return;
+
+  // Rótulos são vários por tarefa: abre a tarefa, onde já existe o editor de chips
+  if (col.edit === 'modal') { openDetail(o.id); return; }
+
+  grid.editando = true;
+  _edit = { cel: cel, html: cel.innerHTML, ordem: o, col: col };
+
+  var campo;
+  if (col.edit === 'data') {
+    campo = document.createElement('input');
+    campo.type = 'date';
+    var d = (col.key === 'inicio') ? o.createdAt : o.deadline;
+    if (d) {
+      var x = new Date(d);
+      campo.value = x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0');
+    }
+  } else if (col.edit === 'select') {
+    campo = document.createElement('select');
+    var ops, atual;
+    if (col.key === 'setor') {
+      ops = SETORES.map(function (s) { return [s, s]; });
+      atual = o.local || '';
+    } else {
+      ops = [['Urgente', 'Crítica'], ['Alta', 'Alta'], ['Normal', 'Média'], ['Baixa', 'Baixa']];
+      atual = { crit: 'Urgente', high: 'Alta', med: 'Normal', low: 'Baixa' }[o.priority] || 'Normal';
+    }
+    campo.innerHTML = ops.map(function (p) {
+      return '<option value="' + p[0] + '"' + (normSetor(p[0]) === normSetor(atual) ? ' selected' : '') + '>' + p[1] + '</option>';
+    }).join('');
+  } else {
+    campo = document.createElement('input');
+    campo.type = 'text';
+    campo.value = (col.key === 'titulo')
+      ? (o.title || '')
+      : (o.assignee === 'Não atribuído' ? '' : (o.assignee || ''));
+    if (col.edit === 'lista') {
+      var dl = document.createElement('datalist');
+      dl.id = 'dlRespInline';
+      dl.innerHTML = RESPONSAVEIS.map(function (r) { return '<option value="' + String(r).replace(/"/g, '&quot;') + '">'; }).join('');
+      cel.innerHTML = '';
+      cel.appendChild(dl);
+      campo.setAttribute('list', 'dlRespInline');
+    }
+  }
+  campo.className = 'cel-edit';
+  if (col.edit !== 'lista') cel.innerHTML = '';
+  cel.appendChild(campo);
+  campo.focus();
+  if (campo.select) { try { campo.select(); } catch (err) {} }
+
+  campo.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter')       { ev.preventDefault(); salvarCelula(campo.value); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); cancelarEdicao(); }
+    else if (ev.key === 'Tab')    { ev.preventDefault(); salvarCelula(campo.value, ev.shiftKey ? -1 : 1); }
+  });
+  // Num select, escolher a opção já é a confirmação — não faz sentido exigir Enter.
+  if (col.edit === 'select') {
+    campo.addEventListener('change', function () { salvarCelula(campo.value); });
+  }
+  campo.addEventListener('blur', function () { if (grid.editando) salvarCelula(campo.value); });
+}
+
+function cancelarEdicao() {
+  if (!grid.editando) return;
+  grid.editando = false;
+  if (_edit) { _edit.cel.innerHTML = _edit.html; _edit = null; }
+  aplicarCursor();
+}
+
+async function salvarCelula(valor, mover) {
+  if (!grid.editando || !_edit) return;
+  var o = _edit.ordem, col = _edit.col;
+  grid.editando = false;
+  _edit = null;
+  await gravarCampo(o, col.key, valor);
+  if (typeof mover === 'number') {
+    grid.col = Math.max(0, Math.min(COLUNAS.length - 1, grid.col + mover));
+  }
+  render();
+}
+
+// Grava um único campo. Cada caminho tem .catch visível e desfaz o local se falhar.
+async function gravarCampo(o, key, valor) {
+  function isoParaBR(iso) {                        // 'YYYY-MM-DD' -> 'DD/MM/YYYY'
+    var p = String(iso || '').split('-');
+    return (p.length === 3) ? p[2] + '/' + p[1] + '/' + p[0] : '';
+  }
+  function isoParaData(iso) {                      // monta no fuso LOCAL, senão o dia volta 1
+    var p = String(iso || '').split('-');
+    return (p.length === 3) ? new Date(+p[0], +p[1] - 1, +p[2]) : null;
+  }
+
+  var upd = null, label = '', antes = '', depois = '', desfaz = null;
+
+  if (key === 'titulo') {
+    var t = (valor || '').trim();
+    if (!t || t === o.title) return true;
+    label = 'Título'; antes = o.title; depois = t;
+    desfaz = (function (v) { return function () { o.title = v; }; })(o.title);
+    o.title = t; upd = { titulo: t };
+  }
+  else if (key === 'assignee') {
+    var n = (valor || '').trim() || 'Não atribuído';
+    if (n === o.assignee) return true;
+    label = 'Responsável'; antes = o.assignee; depois = n;
+    desfaz = (function (v) { return function () { o.assignee = v; }; })(o.assignee);
+    o.assignee = n; upd = { solicitante: n };
+    if (n !== 'Não atribuído' && !RESPONSAVEIS.some(function (x) { return normNome(x) === normNome(n); })) RESPONSAVEIS.unshift(n);
+  }
+  else if (key === 'inicio' || key === 'prazo') {
+    var d = isoParaData(valor);
+    if (!d || isNaN(d.getTime())) return true;
+    var atualD = (key === 'inicio') ? o.createdAt : o.deadline;
+    if (atualD && new Date(atualD).toDateString() === d.toDateString()) return true;
+    label = (key === 'inicio') ? 'Início' : 'Prazo';
+    antes = atualD ? fmtTime(atualD) : 'sem data'; depois = fmtTime(d);
+    if (key === 'inicio') {
+      desfaz = (function (v) { return function () { o.createdAt = v; }; })(o.createdAt);
+      o.createdAt = d; upd = { dataAbertura: isoParaBR(valor) };
+    } else {
+      desfaz = (function (v) { return function () { o.deadline = v; }; })(o.deadline);
+      o.deadline = d; upd = { dataConclusao: isoParaBR(valor) };
+    }
+  }
+  else if (key === 'setor') {
+    if (!valor || normSetor(valor) === normSetor(o.local)) return true;
+    label = 'Setor'; antes = o.local; depois = valor;
+    desfaz = (function (v) { return function () { o.local = v; }; })(o.local);
+    o.local = valor; upd = { setor: valor };
+  }
+  else if (key === 'prio') {
+    var cod = { 'Urgente': 'crit', 'Alta': 'high', 'Normal': 'med', 'Baixa': 'low' }[valor] || 'med';
+    if (cod === o.priority) return true;
+    label = 'Prioridade'; antes = priorityLabel(o.priority); depois = priorityLabel(cod);
+    desfaz = (function (v) { return function () { o.priority = v; }; })(o.priority);
+    o.priority = cod; upd = { prioridade: valor };
+  }
+  else return true;
+
+  o.timeline.push({ time: 'Agora', text: label + ' alterado de "' + antes + '" para "' + depois + '" (edição rápida)' });
+
+  if (o.fromFirebase && o.firestoreId && upd) {
+    try {
+      await updateDoc(doc(db, 'planner', o.firestoreId), upd);
+    } catch (err) {
+      console.log('Erro ao gravar ' + key + ':', err);
+      if (desfaz) desfaz();                        // não deixa a tela mentir
+      o.timeline.pop();
+      if (typeof mostrarToast === 'function') {
+        mostrarToast('Não salvou', label + ' não foi gravado — ' + (err.code || err.message), 'Edição rápida');
+      }
+      return false;
+    }
+  }
+  return true;
 }
 
 function sortOrders(arr) {
@@ -2731,6 +2981,20 @@ function saveAssignee(orderId) {
 
   if (newName !== 'Não atribuído' && !RESPONSAVEIS.includes(newName)) {
     RESPONSAVEIS.unshift(newName);
+  }
+
+  // Persiste no Firebase — sem isto a troca de responsável se perdia no refresh.
+  if (o.fromFirebase && o.firestoreId) {
+    updateDoc(doc(db, 'planner', o.firestoreId), { solicitante: newName })
+      .catch(function (err) {
+        console.log('Erro ao salvar responsável:', err);
+        o.assignee = oldName;
+        if (typeof mostrarToast === 'function') {
+          mostrarToast('Não salvou', 'Responsável não foi gravado — ' + (err.code || err.message), '');
+        }
+        openDetail(orderId);
+        render();
+      });
   }
 
   openDetail(orderId);
@@ -3307,6 +3571,8 @@ function render() {
         — Total: ${filtered.length} demandas —
       </div>`;
   }
+
+  aplicarCursor();
 
   list.querySelectorAll('.th-sort').forEach(function (th) {
     th.addEventListener('click', function () {
@@ -4146,6 +4412,9 @@ function syncFirebaseOrders() {
   orders = orders.filter(o => !o.fromFirebase);
   // Adiciona as novas no início
   orders = [...firebaseOrders, ...orders];
+  // Se há célula em edição, não re-renderiza: destruiria o campo aberto.
+  // O próprio fim da edição chama render().
+  if (grid.editando) return;
   // Re-renderiza
   render();
   if (document.body.classList.contains('kanban-mode')) {
