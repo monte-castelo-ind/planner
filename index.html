@@ -2201,6 +2201,10 @@ select.cel-edit{ cursor:pointer; }
 
   <div id="loginErro" style="font-family: var(--mono); font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--red); margin-top: 10px; min-height: 14px;"></div>
 
+  <label style="display:flex; align-items:center; gap:9px; font-size:13px; color:var(--ink-mute); cursor:pointer; margin:6px 0 2px; text-align:left;">
+    <input type="checkbox" id="loginLembrar" checked style="accent-color:var(--orange); width:17px; height:17px; margin:0; flex:0 0 auto;"> Manter conectado
+  </label>
+
   <button id="loginBtn" style="width: 100%; padding: 14px; margin-top: 14px; background: var(--orange); color: var(--bg); border: none; font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer;">Entrar</button>
 
 </div>
@@ -2443,6 +2447,10 @@ select.cel-edit{ cursor:pointer; }
       <div class="btn-row">
         <button class="btn btn-secondary" id="cfgRestaurar">Restaurar padrão</button>
         <button class="btn btn-primary" id="cfgSalvar">Salvar</button>
+      </div>
+
+      <div style="border-top:1px solid var(--line); margin-top:22px; padding-top:18px;">
+        <button type="button" onclick="if(window.sairApp)window.sairApp()" style="width:100%; padding:12px; background:transparent; border:1px solid var(--line-2); color:var(--ink-mute); font-family:var(--mono); font-size:10px; letter-spacing:0.25em; text-transform:uppercase; cursor:pointer;">Sair da conta</button>
       </div>
     </div>
   </div>
@@ -4910,7 +4918,7 @@ render();
 </div>
   <script type="module">
   import { getApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, browserSessionPersistence, indexedDBLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
   import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   const auth = getAuth(getApp());   // usa o MESMO app Firebase já iniciado no painel
@@ -4928,22 +4936,26 @@ render();
     if (!user) {
       loginScreen.style.display = '';
       document.body.style.overflow = 'hidden';
+      loginBtn.disabled = false;          // sem isto o botão ficava travado depois do 1º erro
       return;
     }
-    let ok = false;
+    let ok = false, dados = null;         // fora do try: antes o 'us' era const dentro do bloco
     try {
       const us = await getDoc(doc(dbAuth, 'usuarios', user.uid));
       ok = us.exists() && us.data().ativo === true;
+      if (us.exists()) dados = us.data();
     } catch (e) { console.log('Erro allowlist:', e); ok = false; }
     if (ok) {
       loginErro.textContent = '';
       loginScreen.style.display = 'none';
       document.body.style.overflow = '';
-      try { if (window.setPlannerUser) window.setPlannerUser((us.data() && us.data().nome) || user.displayName || (user.email || '')); } catch (e) {}
+      loginBtn.disabled = false;
+      try { if (window.setPlannerUser) window.setPlannerUser((dados && dados.nome) || user.displayName || (user.email || '')); } catch (e) {}
     } else {
       loginErro.textContent = 'Sem acesso: ' + (user.email || '');
       loginScreen.style.display = '';
       document.body.style.overflow = 'hidden';
+      loginBtn.disabled = false;
       try { await signOut(auth); } catch (e) {}
     }
   });
@@ -4954,15 +4966,52 @@ render();
     loginErro.textContent = '';
     if (!email || !senha) { loginErro.textContent = 'Preencha e-mail e senha'; return; }
     loginBtn.disabled = true;
-     try {
+
+    // Mesma estrutura do painel Gestão: define a persistência ANTES de entrar.
+    // Sem isso o Firebase pode cair em sessão de memória e a conta se perde
+    // a cada abertura — era o que acontecia no celular.
+    const lembrarEl = document.getElementById('loginLembrar');
+    const lembrar = lembrarEl ? lembrarEl.checked : true;
+
+    // No iOS o IndexedDB às vezes falha (aba privada, storage cheio). Tenta em
+    // cascata em vez de deixar o login morrer.
+    const tentativas = lembrar
+      ? [browserLocalPersistence, indexedDBLocalPersistence, browserSessionPersistence]
+      : [browserSessionPersistence];
+    let persistiu = false;
+    for (const p of tentativas) {
+      try { await setPersistence(auth, p); persistiu = true; break; }
+      catch (ep) { console.log('Persistência recusada:', ep.code || ep.message); }
+    }
+    if (!persistiu) console.log('Nenhuma persistência aceita — a sessão vale só para esta aba.');
+
+    try {
       await signInWithEmailAndPassword(auth, email, senha);
-      location.reload();
+      try {
+        if (lembrar) { localStorage.setItem('mc_last_email', email); }
+        else { localStorage.removeItem('mc_last_email'); }
+      } catch (e) {}
+      // Sem location.reload(): o onAuthStateChanged abaixo já libera a tela.
+      // O reload era o que jogava de volta na tela de senha quando a
+      // persistência não colava.
     } catch (err) {
       console.log('Erro de login:', err.code, err.message);
       loginErro.textContent = err.code || 'Erro ao entrar';
       loginBtn.disabled = false;
     }
   }
+
+  // Reaproveita o e-mail da última vez (mesma chave do Gestão, mesmo domínio)
+  try {
+    const le = localStorage.getItem('mc_last_email');
+    if (le) { loginEmail.value = le; setTimeout(function () { loginSenha.focus(); }, 60); }
+  } catch (e) {}
+
+  window.sairApp = function () {
+    if (!confirm('Sair da conta neste aparelho?')) return;
+    try { localStorage.removeItem('mc_last_email'); } catch (e) {}
+    signOut(auth).catch(function (err) { console.log('Erro ao sair:', err); }).then(function () { location.reload(); });
+  };
 
   loginBtn.addEventListener('click', entrar);
   loginSenha.addEventListener('keydown', (e) => { if (e.key === 'Enter') entrar(); });
