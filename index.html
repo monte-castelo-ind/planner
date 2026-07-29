@@ -2148,27 +2148,8 @@ body.agenda-mode .kanban-view { display: none; }
         <span id="dateLine">QUA · 29 ABR · 09:42</span>
       </div>
       <div class="greeting-text">
-        <span id="greetingHello">Bom dia</span>, <span class="accent" id="greetingUser">Olá</span>.<br>
+        <span id="greetingHello">Bom dia</span>.<br>
         Hoje tem <span class="accent" id="greetingCount">7</span> tarefas.
-      </div>
-    </div>
-
-    <div class="stats">
-      <div class="stat" data-stat-filter="crit">
-        <div class="stat-num crit" id="statCrit">2</div>
-        <div class="stat-label">Críticas</div>
-      </div>
-      <div class="stat" data-stat-filter="all">
-        <div class="stat-num warn" id="statOpen">7</div>
-        <div class="stat-label">Em<br>aberto</div>
-      </div>
-      <div class="stat" data-stat-filter="progress">
-        <div class="stat-num" id="statProg">3</div>
-        <div class="stat-label">Em<br>execução</div>
-      </div>
-      <div class="stat" data-stat-filter="done">
-        <div class="stat-num ok" id="statDone">12</div>
-        <div class="stat-label">Concluídas<br>(semana)</div>
       </div>
     </div>
   </header>
@@ -3154,11 +3135,11 @@ function render() {
   // Concluídas da última semana
   const weekAgo = new Date(Date.now() - 7*24*60*60*1000);
   const recentDone = orders.filter(o=>o.status==='done' && o.createdAt && new Date(o.createdAt) >= weekAgo).length;
-  document.getElementById('statCrit').textContent = open.filter(o=>o.priority==='crit').length;
-  document.getElementById('statOpen').textContent = open.length;
-  document.getElementById('statProg').textContent = orders.filter(o=>o.status==='progress').length;
-  document.getElementById('statDone').textContent = recentDone;
-  document.getElementById('greetingCount').textContent = open.length;
+  _setTxt('statCrit', open.filter(o=>o.priority==='crit').length);
+  _setTxt('statOpen', open.length);
+  _setTxt('statProg', orders.filter(o=>o.status==='progress').length);
+  _setTxt('statDone', recentDone);
+  _setTxt('greetingCount', open.length);
 
   const list = document.getElementById('ordersList');
   const filtered = filterOrders();
