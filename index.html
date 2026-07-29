@@ -882,7 +882,8 @@ header {
 
 .kanban-board {
   display: grid;
-  grid-template-columns: repeat(3, minmax(280px, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(300px, 340px);
   gap: 14px;
   padding: 18px 22px 32px;
   overflow-x: auto;
@@ -919,6 +920,7 @@ header {
   width: 8px; height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
+  background: var(--orange);
 }
 .kanban-col-dot.open { background: var(--yellow); }
 .kanban-col-dot.progress { background: var(--orange); }
@@ -1060,7 +1062,7 @@ header {
 
 @media (max-width: 768px) {
   .kanban-board {
-    grid-template-columns: repeat(3, 86vw);
+    grid-auto-columns: 86vw;
     gap: 10px;
     padding: 14px;
     scroll-snap-type: x mandatory;
@@ -2214,29 +2216,7 @@ body.agenda-mode .kanban-view { display: none; }
       </div>
 
     </div>
-    <div class="kanban-board" id="kanbanBoard">
-      <div class="kanban-col" data-status="open">
-        <div class="kanban-col-head">
-          <div class="kanban-col-name"><span class="kanban-col-dot open"></span>Em aberto</div>
-          <div class="kanban-col-count" id="kCountOpen">0 cards</div>
-        </div>
-        <div class="kanban-col-body" data-drop="open" id="kBodyOpen"></div>
-      </div>
-      <div class="kanban-col" data-status="progress">
-        <div class="kanban-col-head">
-          <div class="kanban-col-name"><span class="kanban-col-dot progress"></span>Em execução</div>
-          <div class="kanban-col-count" id="kCountProg">0 cards</div>
-        </div>
-        <div class="kanban-col-body" data-drop="progress" id="kBodyProg"></div>
-      </div>
-      <div class="kanban-col" data-status="done">
-        <div class="kanban-col-head">
-          <div class="kanban-col-name"><span class="kanban-col-dot done"></span>Concluídas</div>
-          <div class="kanban-col-count" id="kCountDone">0 cards</div>
-        </div>
-        <div class="kanban-col-body" data-drop="done" id="kBodyDone"></div>
-      </div>
-    </div>
+    <div class="kanban-board" id="kanbanBoard"></div>
   </section>
 
 
@@ -3381,6 +3361,39 @@ document.getElementById('saveNew').addEventListener('click', async () => {
 });
 
 const modalDetail = document.getElementById('modalDetail');
+function rotChipsHTML(o){
+  if(!ROTULOS.length) return '<span style="font-size:12px;color:var(--ink-mute);">Nenhum rótulo cadastrado — crie em Configuração (⚙).</span>';
+  var atuais=(o.rotulos||[]).map(function(x){return normNome(x);});
+  return ROTULOS.map(function(r){
+    var on=atuais.indexOf(normNome(r.nome))>=0;
+    var cor=r.cor||'#8a91a3';
+    return '<button type="button" class="rot-toggle" data-rot-toggle="'+o.id+'" data-rot-nome="'+String(r.nome).replace(/"/g,'&quot;')+'" '
+      + 'style="background:'+(on?cor:'transparent')+';color:'+(on?corTexto(cor):'var(--ink)')+';border:1px solid '+(on?cor:'var(--line-2)')+';border-radius:6px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">'
+      + '<span style="width:9px;height:9px;border-radius:3px;background:'+cor+';display:inline-block;"></span>'
+      + r.nome + (on?' ✓':'') + '</button>';
+  }).join('');
+}
+function bindRotulosEditor(orderId){
+  var wrap=document.getElementById('rotChips_'+orderId.replace(/[^a-zA-Z0-9]/g,'_'));
+  if(!wrap) return;
+  wrap.querySelectorAll('[data-rot-toggle]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var o=orders.find(function(x){return x.id===orderId;}); if(!o) return;
+      var nome=this.getAttribute('data-rot-nome');
+      var arr=(o.rotulos||[]).slice();
+      var i=arr.findIndex(function(x){return normNome(x)===normNome(nome);});
+      if(i>=0) arr.splice(i,1); else arr.push(nome);
+      o.rotulos=arr;
+      wrap.innerHTML=rotChipsHTML(o);
+      bindRotulosEditor(orderId);
+      render();
+      if(o.fromFirebase && o.firestoreId){
+        updateDoc(doc(db,'planner',o.firestoreId), { rotulos: arr })
+          .catch(function(e){ console.log('Erro salvar rótulos:', e); if(typeof mostrarToast==='function') mostrarToast('Erro','Não foi possível salvar o rótulo.',''); });
+      }
+    });
+  });
+}
 function openDetail(id) {
   const o = orders.find(x => x.id === id);
   if (!o) return;
@@ -3485,6 +3498,13 @@ function openDetail(id) {
             <button class="desc-save-btn" data-save-desc="${o.id}">OK</button>
             <button class="desc-cancel-btn" data-cancel-desc="${o.id}">Cancelar</button>
           </div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-label">Rótulos</div>
+        <div class="rot-chips" id="rotChips_${o.id.replace(/[^a-zA-Z0-9]/g,'_')}" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">
+          ${rotChipsHTML(o)}
         </div>
       </div>
 
@@ -3628,6 +3648,9 @@ function openDetail(id) {
   // Bind editor de setor
   bindSetorEditor(o.id);
 
+  // Bind editor de rótulos
+  bindRotulosEditor(o.id);
+
   // Bind editor de descrição
   bindDescEditor(o.id);
 
@@ -3692,7 +3715,6 @@ const kanbanState = { search: '', bucket: '', shownPerCol: { open: 100, progress
 function renderKanban() {
   const q = (kanbanState.search || '').toLowerCase().trim();
   const filtered = orders.filter(o => {
-    if (kanbanState.bucket && !bucketMatch(o.local, kanbanState.bucket)) return false;
     if (q) {
       const hay = (o.title + ' ' + o.local + ' ' + o.assignee + ' ' + o.id + ' ' + (o.desc||'')).toLowerCase();
       if (!hay.includes(q)) return false;
@@ -3703,84 +3725,79 @@ function renderKanban() {
     return true;
   });
 
-  const byStatus = { open: [], progress: [], done: [] };
-  filtered.forEach(o => {
-    if (byStatus[o.status]) byStatus[o.status].push(o);
-  });
-
-  // Ordenar concluídas pela mais recente
-  byStatus.done.sort((a,b) => {
-    const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-    const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-    return db - da;
-  });
-
-  document.getElementById('kCountOpen').textContent = byStatus.open.length + ' cards';
-  document.getElementById('kCountProg').textContent = byStatus.progress.length + ' cards';
-  document.getElementById('kCountDone').textContent = byStatus.done.length + ' cards';
   document.getElementById('kanbanMeta').textContent = filtered.length + ' demandas no quadro';
 
-  ['open', 'progress', 'done'].forEach(st => {
-    const el = document.getElementById('kBody' + (st === 'open' ? 'Open' : st === 'progress' ? 'Prog' : 'Done'));
-    const items = byStatus[st];
-    const limit = kanbanState.shownPerCol[st];
-    const visible = items.slice(0, limit);
-    
-    if (!items.length) {
-      el.innerHTML = '<div class="kanban-empty">Sem demandas</div>';
-      return;
-    }
-    
-    el.innerHTML = visible.map(o => {
-      const cls = ['done','waiting_part','waiting_auth','paused'].includes(o.status) ? o.status : o.priority;
-      const prioLabel = { crit: 'CRÍT', high: 'ALTA', med: 'MÉDIA', low: 'BAIXA' }[o.priority] || '';
-      const typeLabel = { os: 'OS', task: 'TAREFA', prev: 'PREV' }[o.type] || '';
-      return `
+  // Colunas = buckets (setores). Filtro de bucket mostra só aquele.
+  const cols = kanbanState.bucket ? [kanbanState.bucket] : SETORES.slice();
+  const usados = new Set();
+  const porBucket = {};
+  cols.forEach(b => {
+    porBucket[b] = filtered.filter(o => bucketMatch(o.local, b));
+    porBucket[b].forEach(o => usados.add(o.id));
+  });
+  const semBucket = filtered.filter(o => !usados.has(o.id));
+
+  const cardHTML = (o) => {
+    const cls = ['done','waiting_part','waiting_auth','paused'].includes(o.status) ? o.status : o.priority;
+    const prioLabel = { crit: 'CRÍT', high: 'ALTA', med: 'MÉDIA', low: 'BAIXA' }[o.priority] || '';
+    const stTag = { open:'ABERTO', progress:'EXEC', done:'OK', waiting_part:'PEÇA', waiting_auth:'AUTORIZ', paused:'PAUSA' }[o.status] || '';
+    return `
         <div class="kanban-card ${cls}" draggable="true" data-id="${o.id}">
           <div class="kanban-card-meta">
             <span class="kanban-card-id">${o.id}</span>
             <span class="kanban-card-prio ${cls}">${o.status === 'done' ? 'OK' : prioLabel}</span>
-            <span>${typeLabel}</span>
-            ${o.origem === 'requisicao_area' ? '<span class="req-badge" style="font-size:7px;padding:1px 4px;">📨</span>' : ''}
+            <span>${stTag}</span>
           </div>
           <div class="kanban-card-title">${o.title}</div>
           <div class="kanban-card-footer">
             <span class="kanban-card-bucket">${o.local}</span>
             <span class="kanban-card-assignee">${o.assignee}</span>
           </div>
+        </div>`;
+  };
+  const colHTML = (nome, items) => `
+      <div class="kanban-col">
+        <div class="kanban-col-head">
+          <div class="kanban-col-name"><span class="kanban-col-dot"></span>${tituloSetor(nome)}</div>
+          <div class="kanban-col-count">${items.length} cards</div>
         </div>
-      `;
-    }).join('');
-    
-    if (items.length > limit) {
-      el.innerHTML += `<button class="kanban-load-more" data-col="${st}">+ ${items.length - limit} restantes</button>`;
-    }
-  });
+        <div class="kanban-col-body" data-drop-bucket="${String(nome).replace(/"/g,'&quot;')}">${items.length ? items.map(cardHTML).join('') : '<div class="kanban-empty">Sem demandas</div>'}</div>
+      </div>`;
+
+  const board = document.getElementById('kanbanBoard');
+  let html = '';
+  cols.forEach(b => { html += colHTML(b, porBucket[b]); });
+  if (semBucket.length) html += colHTML('SEM SETOR', semBucket);
+  board.innerHTML = html;
 
   // Bind cards
-  document.querySelectorAll('.kanban-card').forEach(card => {
-    card.addEventListener('click', (e) => {
-      if (!card.classList.contains('dragging')) {
-        openDetail(card.dataset.id);
-      }
-    });
-    card.addEventListener('dragstart', (e) => {
-      card.classList.add('dragging');
-      e.dataTransfer.setData('text/plain', card.dataset.id);
-      e.dataTransfer.effectAllowed = 'move';
-    });
-    card.addEventListener('dragend', () => {
-      card.classList.remove('dragging');
-      document.querySelectorAll('.kanban-col').forEach(c => c.classList.remove('drag-over'));
-    });
+  board.querySelectorAll('.kanban-card').forEach(card => {
+    card.addEventListener('click', () => { if (!card.classList.contains('dragging')) openDetail(card.dataset.id); });
+    card.addEventListener('dragstart', (e) => { card.classList.add('dragging'); e.dataTransfer.setData('text/plain', card.dataset.id); e.dataTransfer.effectAllowed = 'move'; });
+    card.addEventListener('dragend', () => { card.classList.remove('dragging'); board.querySelectorAll('.kanban-col').forEach(c => c.classList.remove('drag-over')); });
   });
 
-  // Bind load more
-  document.querySelectorAll('.kanban-load-more').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      kanbanState.shownPerCol[btn.dataset.col] += 100;
-      renderKanban();
+  // Bind drop por bucket (colunas são dinâmicas)
+  board.querySelectorAll('.kanban-col-body').forEach(bodyEl => {
+    bodyEl.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; bodyEl.closest('.kanban-col').classList.add('drag-over'); });
+    bodyEl.addEventListener('dragleave', (e) => { if (!bodyEl.contains(e.relatedTarget)) bodyEl.closest('.kanban-col').classList.remove('drag-over'); });
+    bodyEl.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      bodyEl.closest('.kanban-col').classList.remove('drag-over');
+      const id = e.dataTransfer.getData('text/plain');
+      const novoBucket = bodyEl.getAttribute('data-drop-bucket');
+      if (novoBucket === 'SEM SETOR') return;
+      const o = orders.find(x => x.id === id);
+      if (o && normSetor(o.local) !== normSetor(novoBucket)) {
+        o.local = novoBucket;
+        o.timeline.push({ time: 'Agora', text: `Setor alterado para "${novoBucket}" via Kanban` });
+        if (o.fromFirebase && o.firestoreId) {
+          try { await updateDoc(doc(db, 'planner', o.firestoreId), { setor: novoBucket }); }
+          catch (err) { console.log('Erro ao salvar setor:', err); }
+        }
+        renderKanban();
+        render();
+      }
     });
   });
 }
