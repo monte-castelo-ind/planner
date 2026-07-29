@@ -2080,6 +2080,7 @@ body.agenda-mode .kanban-view { display: none; }
 .filter-select:focus{border-color:var(--orange);}
 @media(max-width:760px){ .filter-selects{padding-left:18px;padding-right:18px;} .filter-sel-wrap{flex:1 1 100%;} .filter-select{flex:1;width:100%;} #config-btn{flex:1 1 100%;} }
 .tbl{ display:block; width:100%; }
+.tbl-head, .tbl-row{ display:grid; grid-template-columns: 2.2fr 1.3fr .9fr .9fr 1.2fr 1fr 1.4fr; gap:12px; align-items:center; padding:7px 22px; }
 
 .tbl-head{ position:sticky; top:0; background:var(--bg-2); border-bottom:1px solid var(--line-2); font-family:var(--mono); font-size:9px; letter-spacing:.18em; text-transform:uppercase; color:var(--ink-mute); z-index:2; }
 .tbl-row{ border-bottom:1px solid var(--line); cursor:pointer; font-size:13px; color:var(--ink); border-left:3px solid transparent; transition:background .12s; }
