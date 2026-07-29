@@ -2080,6 +2080,12 @@ body.agenda-mode #sharedFilters { display: none; }
 .tbl-head, .tbl-row{ display:grid; grid-template-columns: 2.2fr 1.3fr .9fr .9fr 1.2fr 1fr 1.4fr; gap:12px; align-items:center; padding:7px 22px; }
 
 .tbl-head{ position:sticky; top:0; background:var(--bg-2); border-bottom:1px solid var(--line-2); font-family:var(--mono); font-size:9px; letter-spacing:.18em; text-transform:uppercase; color:var(--ink-mute); z-index:2; }
+.th-sort{ display:flex; align-items:center; gap:5px; cursor:pointer; user-select:none; -webkit-user-select:none; transition:color .12s; }
+.th-sort:hover{ color:var(--ink); }
+.th-sort.ativo{ color:var(--orange); }
+.sort-ar{ font-size:11px; line-height:1; letter-spacing:0; opacity:.3; flex:0 0 auto; }
+.th-sort:hover .sort-ar{ opacity:.75; }
+.th-sort.ativo .sort-ar{ opacity:1; }
 .tbl-row{ border-bottom:1px solid var(--line); cursor:pointer; font-size:13px; color:var(--ink); border-left:3px solid transparent; transition:background .12s; }
 .tbl-row:hover{ background:var(--bg-2); }
 .tbl-row.crit{ border-left-color:var(--red); } .tbl-row.high{ border-left-color:var(--yellow); } .tbl-row.med{ border-left-color:var(--blue); } .tbl-row.low{ border-left-color:var(--ink-mute); } .tbl-row.done{ border-left-color:var(--green); opacity:.6; }
@@ -2395,7 +2401,50 @@ orders.forEach(o => {
   o.createdAt = o.createdAt ? new Date(o.createdAt) : null;
 });
 
-let state = { tab: 'all', filter: 'all', bucket: null, search: '', shown: 60, periodo: 'all', periodoCampo: 'deadline' };
+let state = { tab: 'all', filter: 'all', bucket: null, search: '', shown: 60, periodo: 'all', periodoCampo: 'deadline', sortKey: null, sortDir: 'asc' };
+
+// ===== Ordenação da tabela =====
+// Fonte única: cabeçalho e ordenação saem daqui, então não podem divergir.
+var COLUNAS = [
+  { key: 'titulo',   label: 'Nome da Tarefa' },
+  { key: 'assignee', label: 'Atribuída a'    },
+  { key: 'inicio',   label: 'Início'         },
+  { key: 'prazo',    label: 'Concluir'       },
+  { key: 'setor',    label: 'Bucket'         },
+  { key: 'prio',     label: 'Prioridade'     },
+  { key: 'rotulos',  label: 'Rótulos'        }
+];
+
+function valorColuna(o, key) {
+  if (key === 'titulo')   return o.title || '';
+  if (key === 'assignee') return o.assignee || '';
+  if (key === 'inicio')   return o.createdAt ? new Date(o.createdAt).getTime() : null;
+  if (key === 'prazo')    return o.deadline ? new Date(o.deadline).getTime() : null;
+  if (key === 'setor')    return o.local || '';
+  if (key === 'rotulos')  return (o.rotulos || []).join(', ');
+  if (key === 'prio') {
+    // crescente = mais urgente primeiro
+    var r = { crit: 0, high: 1, med: 2, low: 3 }[o.priority];
+    return (r === undefined) ? 9 : r;
+  }
+  return '';
+}
+
+function sortOrders(arr) {
+  if (!state.sortKey) return arr;
+  var dir = (state.sortDir === 'desc') ? -1 : 1;
+  var key = state.sortKey;
+  function vazio(v) { return v === null || v === undefined || v === ''; }
+  return arr.slice().sort(function (a, b) {
+    var va = valorColuna(a, key), vb = valorColuna(b, key);
+    // Sem valor ("—") vai sempre para o fim, nas duas direções.
+    if (vazio(va) && vazio(vb)) return 0;
+    if (vazio(va)) return 1;
+    if (vazio(vb)) return -1;
+    if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+    return String(va).localeCompare(String(vb), 'pt-BR', { sensitivity: 'base' }) * dir;
+  });
+}
 // ===== Config: Setores, Responsáveis, Rótulos (fonte única) =====
 const SETORES_PADRAO = ['ADMINISTRATIVO','CONFEITARIA','COZINHA/CONF','DIRETORIA','EMBALAÇÃO','EXPEDIÇÃO','FROTA','LIMPEZA','PANIFICAÇÃO','PREDIAL','RECEBIMENTO','REFEITÓRIO','OUTRO','PROJETOS','TAREFAS MIGUEL'];
 let SETORES = SETORES_PADRAO.slice();
@@ -3086,7 +3135,7 @@ function render() {
   _setTxt('greetingCount', open.length);
 
   const list = document.getElementById('ordersList');
-  const filtered = filterOrders();
+  const filtered = sortOrders(filterOrders());
   if (!filtered.length) {
     list.innerHTML = `
       <div class="empty">
@@ -3109,7 +3158,15 @@ function render() {
   const prioDot = { crit:'var(--red)', high:'var(--yellow)', med:'var(--blue)', low:'var(--ink-mute)' };
   const rotTags = (arr) => (arr && arr.length ? arr.map(function(nm){ var c=rotuloCor(nm); return '<span class="rotulo-tag" style="background:'+c+';color:'+corTexto(c)+'">'+nm+'</span>'; }).join('') : '<span style="color:var(--ink-faint)">—</span>');
   let rowsHtml = '<div class="tbl-head">'
-    + '<div>Nome da Tarefa</div><div>Atribuída a</div><div>Início</div><div>Concluir</div><div>Bucket</div><div>Prioridade</div><div>Rótulos</div>'
+    + COLUNAS.map(function (c) {
+        var ativo = (state.sortKey === c.key);
+        var seta = ativo ? (state.sortDir === 'asc' ? '↑' : '↓') : '↕';
+        var titulo = ativo
+          ? c.label + ' — ' + (state.sortDir === 'asc' ? 'crescente' : 'decrescente') + ' (clique para inverter)'
+          : 'Ordenar por ' + c.label;
+        return '<div class="th-sort' + (ativo ? ' ativo' : '') + '" data-sort="' + c.key + '" title="' + titulo + '">'
+             + c.label + '<span class="sort-ar">' + seta + '</span></div>';
+      }).join('')
     + '</div>';
   rowsHtml += visibleItems.map(o => {
     const cls = ['done','waiting_part','waiting_auth','paused'].includes(o.status) ? o.status : o.priority;
@@ -3147,6 +3204,20 @@ function render() {
         — Total: ${filtered.length} demandas —
       </div>`;
   }
+
+  list.querySelectorAll('.th-sort').forEach(function (th) {
+    th.addEventListener('click', function () {
+      var k = th.getAttribute('data-sort');
+      if (state.sortKey === k) {
+        state.sortDir = (state.sortDir === 'asc') ? 'desc' : 'asc';
+      } else {
+        state.sortKey = k;
+        state.sortDir = 'asc';
+      }
+      state.shown = 60;
+      render();
+    });
+  });
 
   list.querySelectorAll('.tbl-row').forEach(el => {
     el.addEventListener('click', () => openDetail(el.dataset.id));
