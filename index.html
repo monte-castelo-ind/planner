@@ -1,37 +1,58 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#1A1A1A">
+<meta name="theme-color" content="#0f111a">
 <title>Planner — Monte Castelo</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
+<script>try{var _t=localStorage.getItem('mc_planner_theme');if(_t==='dark'||_t==='light')document.documentElement.setAttribute('data-theme',_t);}catch(e){}</script>
 <style>
-:root {
-  --bg: #1A1A1A;
-  --bg-2: #222222;
-  --bg-3: #2B2B2B;
-  --concrete: #3A3A3A;
-  --steel: #4F4F4F;
-  --paper: #F5F2EC;
-  --ink: #ECEAE5;
-  --ink-mute: #8A8680;
-  --ink-faint: #5A5650;
-  --line: rgba(255, 255, 255, 0.08);
-  --line-2: rgba(255, 255, 255, 0.14);
-  --orange: #F26B1F;
-  --orange-soft: #B84F15;
-  --yellow: #E8B923;
-  --green: #4A8B5C;
-  --red: #C13F3F;
-  --blue: #5687A8;
+/* Tema Gestão (claro/escuro) mapeado sobre as variáveis do painel */
+:root, html[data-theme="dark"] {
+  --bg: #0f111a;
+  --bg-2: #191c29;
+  --bg-3: #212536;
+  --concrete: #2a2f40;
+  --steel: #3a4055;
+  --paper: #f4f6fb;
+  --ink: #e7e9f0;
+  --ink-mute: #868da3;
+  --ink-faint: #5a6070;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-2: rgba(255, 255, 255, 0.12);
+  --orange: #2fae7d;
+  --orange-soft: #1cc47e;
+  --yellow: #f5b013;
+  --green: #1cc47e;
+  --red: #f26a6a;
+  --blue: #5b8def;
   --display: 'Archivo Black', sans-serif;
   --sans: 'Archivo', sans-serif;
   --mono: 'JetBrains Mono', monospace;
+}
+html[data-theme="light"] {
+  --bg: #eef1f6;
+  --bg-2: #ffffff;
+  --bg-3: #f6f8fb;
+  --concrete: #eaeef5;
+  --steel: #d7dde8;
+  --paper: #131a2b;
+  --ink: #1c2333;
+  --ink-mute: #8a91a3;
+  --ink-faint: #aab0be;
+  --line: #e8ebf1;
+  --line-2: #dfe3ea;
+  --orange: #1f8a5f;
+  --orange-soft: #16b364;
+  --yellow: #f5b013;
+  --green: #16b364;
+  --red: #ef4444;
+  --blue: #3f6fd1;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -4525,6 +4546,20 @@ render();
   loginBtn.addEventListener('click', entrar);
   loginSenha.addEventListener('keydown', (e) => { if (e.key === 'Enter') entrar(); });
   loginEmail.addEventListener('keydown', (e) => { if (e.key === 'Enter') entrar(); });
+</script>
+<button id="theme-btn" onclick="toggleTheme()" title="Alternar tema claro/escuro" aria-label="Alternar tema" style="position:fixed;top:14px;right:14px;z-index:10000;width:40px;height:40px;border-radius:11px;border:1px solid var(--line-2);background:var(--bg-2);color:var(--ink);font-size:17px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.25);">🌙</button>
+<script>
+function applyTheme(novo){
+  document.documentElement.setAttribute('data-theme', novo);
+  var dark = novo === 'dark';
+  var btn = document.getElementById('theme-btn'); if (btn) btn.textContent = dark ? '☀️' : '🌙';
+  try { localStorage.setItem('mc_planner_theme', novo); } catch(e){}
+}
+window.toggleTheme = function(){
+  var cur = document.documentElement.getAttribute('data-theme');
+  applyTheme(cur === 'dark' ? 'light' : 'dark');
+};
+(function(){ var t; try { t = localStorage.getItem('mc_planner_theme'); } catch(e){} if (t !== 'dark' && t !== 'light') t = 'dark'; applyTheme(t); })();
 </script>
 </body>
 </html>
