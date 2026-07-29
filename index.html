@@ -95,7 +95,7 @@ header {
 }
 
 .header-stripe {
-  height: 6px;
+  height: 4px;
   background: repeating-linear-gradient(
     -45deg,
     var(--orange) 0 14px,
@@ -104,7 +104,7 @@ header {
 }
 
 .header-main {
-  padding: 18px 22px 16px;
+  padding: 12px 22px 6px;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -165,12 +165,12 @@ header {
   text-transform: uppercase;
 }
 
-.greeting-block { padding: 18px 22px 22px; }
+.greeting-block { padding: 8px 22px 12px; }
 .greeting-meta {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 5px;
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.15em;
@@ -193,8 +193,8 @@ header {
 }
 .greeting-text {
   font-family: var(--display);
-  font-size: 30px;
-  line-height: 1;
+  font-size: 22px;
+  line-height: 1.05;
   letter-spacing: -0.03em;
   text-transform: uppercase;
 }
@@ -2080,7 +2080,7 @@ body.agenda-mode .kanban-view { display: none; }
 .filter-select:focus{border-color:var(--orange);}
 @media(max-width:760px){ .filter-selects{padding-left:18px;padding-right:18px;} .filter-sel-wrap{flex:1 1 100%;} .filter-select{flex:1;width:100%;} #config-btn{flex:1 1 100%;} }
 .tbl{ display:block; width:100%; }
-.tbl-head, .tbl-row{ display:grid; grid-template-columns: 2.2fr 1.3fr .9fr .9fr 1.2fr 1fr 1.4fr; gap:12px; align-items:center; padding:11px 22px; }
+
 .tbl-head{ position:sticky; top:0; background:var(--bg-2); border-bottom:1px solid var(--line-2); font-family:var(--mono); font-size:9px; letter-spacing:.18em; text-transform:uppercase; color:var(--ink-mute); z-index:2; }
 .tbl-row{ border-bottom:1px solid var(--line); cursor:pointer; font-size:13px; color:var(--ink); border-left:3px solid transparent; transition:background .12s; }
 .tbl-row:hover{ background:var(--bg-2); }
@@ -2155,14 +2155,14 @@ body.agenda-mode .kanban-view { display: none; }
   </header>
 
 
-  <div style="padding: 14px 22px 0; border-bottom: 1px solid var(--line);">
+  <div style="padding: 10px 22px 0; border-bottom: 1px solid var(--line);">
     <div style="position: relative; max-width: 340px;">
       <input type="text" id="searchInput" placeholder="Filtrar por palavra-chave" style="width: 100%; background: var(--bg-2); border: 1px solid var(--line-2); color: var(--ink); padding: 8px 12px 8px 32px; font-family: var(--sans); font-size: 12px; border-radius: 8px; outline: none;">
       <svg style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--ink-mute);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
     </div>
   </div>
 
-  <div class="filter-selects" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;padding:12px 22px 2px;">
+  <div class="filter-selects" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;padding:8px 22px 6px;">
     <label class="filter-sel-wrap"><span class="filter-sel-label">Setor</span><select id="fSetor" class="filter-select"><option value="">Todos os setores</option></select></label>
     <label class="filter-sel-wrap"><span class="filter-sel-label">Prazo</span><select id="fPrazo" class="filter-select"><option value="all">Todos</option><option value="hoje">Hoje</option><option value="amanha">Amanhã</option><option value="semana">Esta semana</option><option value="mes">Este mês</option><option value="atrasadas">Atrasadas</option></select></label>
   </div>
