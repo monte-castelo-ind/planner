@@ -2082,7 +2082,7 @@ body.agenda-mode #sharedFilters { display: none; }
 .tbl-head{ position:sticky; top:0; background:var(--bg-2); border-bottom:1px solid var(--line-2); font-family:var(--mono); font-size:9px; letter-spacing:.18em; text-transform:uppercase; color:var(--ink-mute); z-index:2; }
 .tbl-row{ border-bottom:1px solid var(--line); cursor:pointer; font-size:13px; color:var(--ink); border-left:3px solid transparent; transition:background .12s; }
 .tbl-row:hover{ background:var(--bg-2); }
-.tbl-row.crit{ border-left-color:var(--red); } .tbl-row.high{ border-left-color:var(--yellow); } .tbl-row.med{ border-left-color:var(--blue); } .tbl-row.done{ border-left-color:var(--green); opacity:.6; }
+.tbl-row.crit{ border-left-color:var(--red); } .tbl-row.high{ border-left-color:var(--yellow); } .tbl-row.med{ border-left-color:var(--blue); } .tbl-row.low{ border-left-color:var(--ink-mute); } .tbl-row.done{ border-left-color:var(--green); opacity:.6; }
 .tcell{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
 .tcell-title{ display:flex; align-items:center; gap:8px; white-space:normal; }
 .tbl-idtag{ font-family:var(--mono); font-size:9px; letter-spacing:.05em; color:var(--ink-mute); background:var(--bg-3); border:1px solid var(--line); border-radius:5px; padding:2px 6px; flex:0 0 auto; }
@@ -2932,7 +2932,8 @@ async function salvarPrioridade(orderId, novaPrioridade) {
   // No Firestore o campo "prioridade" usa o label em PT (Crítica/Alta/Normal/Baixa)
   if (o.fromFirebase && o.firestoreId) {
     try {
-      const prioridadeBR = { crit: 'Crítica', high: 'Alta', med: 'Normal', low: 'Baixa' }[novaPrioridade] || 'Normal';
+      // Mesmo vocabulário da criação (saveNew), senão a prioridade não volta igual.
+      const prioridadeBR = { crit: 'Urgente', high: 'Alta', med: 'Normal', low: 'Baixa' }[novaPrioridade] || 'Normal';
       await updateDoc(doc(db, 'planner', o.firestoreId), { prioridade: prioridadeBR });
     } catch (err) {
       console.error('Erro ao salvar prioridade no Firebase:', err);
@@ -3255,7 +3256,7 @@ document.getElementById('saveNew').addEventListener('click', async () => {
   const desc = document.getElementById('newDesc').value || '—';
 
   // Conversões para o formato do Firestore (collection `chamados`)
-  const prioMap = { crit: 'Urgente', high: 'Alta', med: 'Normal', low: 'Normal' };
+  const prioMap = { crit: 'Urgente', high: 'Alta', med: 'Normal', low: 'Baixa' };
   const prioridade = prioMap[selPrio] || 'Normal';
 
   const now = new Date();
@@ -3881,10 +3882,19 @@ function statusToOrder(status) {
 }
 
 function prioToOrder(prioridade) {
+  // Aceita TODAS as variantes já gravadas no banco. O painel gravou
+  // 'Crítica' (editor) e 'Urgente' (criação) para a mesma prioridade,
+  // e a importação do Planner MS trouxe 'Normal'/'Baixa'.
   const map = {
     'Urgente': 'crit',
+    'Crítica': 'crit',
+    'Critica': 'crit',
     'Alta': 'high',
-    'Normal': 'med'
+    'Importante': 'high',
+    'Normal': 'med',
+    'Média': 'med',
+    'Media': 'med',
+    'Baixa': 'low'
   };
   return map[prioridade] || 'med';
 }
