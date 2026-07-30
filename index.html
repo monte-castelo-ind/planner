@@ -2153,6 +2153,47 @@ body.kanban-mode .greeting-block { display: none; }
   .filtro-op{ padding:9px 6px; font-size:15px; }
 }
 
+/* ---- botão de mover no cartão + folha de setores (toque) ---- */
+.kanban-mover{
+  display:none; position:absolute; top:6px; right:6px;
+  width:30px; height:30px; border-radius:8px;
+  background:var(--bg-3); border:1px solid var(--line-2);
+  color:var(--ink-mute); font-size:14px; line-height:1; cursor:pointer;
+  align-items:center; justify-content:center; padding:0;
+}
+.kanban-mover:hover{ color:var(--orange); border-color:var(--orange); }
+@media (max-width:900px){
+  .kanban-mover{ display:flex; width:34px; height:34px; font-size:16px; }
+  .kanban-card-title{ padding-right:34px; }   /* título não passa por baixo do botão */
+}
+
+.mover-back{
+  position:fixed; inset:0; z-index:300; display:none;
+  background:rgba(0,0,0,.6); backdrop-filter:blur(3px);
+  align-items:flex-end; justify-content:center;
+}
+.mover-back.open{ display:flex; }
+.mover-folha{
+  width:100%; max-width:560px; max-height:78vh; display:flex; flex-direction:column;
+  background:var(--bg-2); border:1px solid var(--line-2); border-top:2px solid var(--orange);
+  border-radius:14px 14px 0 0; animation:moverSobe .22s cubic-bezier(.2,.8,.2,1);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+@keyframes moverSobe{ from{ transform:translateY(100%); } to{ transform:translateY(0); } }
+.mover-topo{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:16px 18px 12px; border-bottom:1px solid var(--line); }
+.mover-tit{ font-family:var(--display); font-size:15px; text-transform:uppercase; letter-spacing:-.01em; }
+.mover-sub{ font-size:13px; color:var(--ink-mute); margin-top:4px; line-height:1.4; }
+.mover-x{ background:none; border:none; color:var(--ink-mute); font-size:22px; width:36px; height:36px; cursor:pointer; flex:0 0 auto; }
+.mover-lista{ overflow-y:auto; padding:8px 10px 14px; }
+.mover-op{
+  width:100%; text-align:left; display:flex; align-items:center; gap:10px;
+  background:none; border:none; border-radius:8px; color:var(--ink);
+  font-family:var(--sans); font-size:15px; padding:13px 12px; cursor:pointer;
+}
+.mover-op:hover{ background:var(--bg-3); }
+.mover-op.atual{ color:var(--orange); font-weight:600; }
+.mover-op .mv-n{ margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--ink-faint); }
+
 /* seletor de tema dentro de Configurações */
 .tema-opt{ flex:1; padding:12px 10px; background:var(--bg-2); border:1px solid var(--line-2); color:var(--ink-mute); font-family:var(--mono); font-size:10px; letter-spacing:.18em; text-transform:uppercase; cursor:pointer; transition:all .15s; }
 .tema-opt:hover{ color:var(--ink); border-color:var(--steel); }
@@ -2642,6 +2683,8 @@ document.addEventListener('keydown', function (e) {
   // Esc tem prioridade: cancela edição > fecha modal > limpa cursor
   if (e.key === 'Escape') {
     if (grid.editando) { e.preventDefault(); cancelarEdicao(); return; }
+    var mv = document.querySelector('.mover-back.open');
+    if (mv) { e.preventDefault(); mv.classList.remove('open'); return; }
     var m = modalAberto();
     if (m) { e.preventDefault(); m.classList.remove('open'); return; }
     if (grid.row >= 0) { e.preventDefault(); grid.row = -1; grid.col = -1; grid.modo = 'celula'; aplicarCursor(); }
@@ -4449,6 +4492,7 @@ function renderKanban() {
             <span>${stTag}</span>
           </div>
           <div class="kanban-card-title">${o.title}</div>
+          <button type="button" class="kanban-mover" data-mover="${o.id}" aria-label="Mover para outro setor" title="Mover para outro setor">⇄</button>
           <div class="kanban-card-footer">
             <span class="kanban-card-bucket">${o.local}</span>
             <span class="kanban-card-assignee">${o.assignee}</span>
@@ -4471,6 +4515,13 @@ function renderKanban() {
   board.innerHTML = html;
 
   // Bind cards
+  board.querySelectorAll('[data-mover]').forEach(function (b) {
+    b.addEventListener('click', function (e) {
+      e.stopPropagation();          // senão o clique do cartão abriria a tarefa também
+      abrirMover(b.getAttribute('data-mover'));
+    });
+  });
+
   board.querySelectorAll('.kanban-card').forEach(card => {
     card.addEventListener('click', () => { if (!card.classList.contains('dragging')) openDetail(card.dataset.id); });
     card.addEventListener('dragstart', (e) => { card.classList.add('dragging'); e.dataTransfer.setData('text/plain', card.dataset.id); e.dataTransfer.effectAllowed = 'move'; });
@@ -4501,6 +4552,84 @@ function renderKanban() {
     });
   });
 }
+
+/* ===== Mover cartão de setor pelo toque =====
+   O arrastar do desktop é HTML5 e não existe em toque. Em vez de reimplementar
+   arrasto (que brigaria com a rolagem da coluna e exigiria rolar 17 colunas
+   com o dedo preso), o cartão ganha um botão que abre esta folha. */
+var _moverId = null;
+
+function abrirMover(id) {
+  var o = orders.find(function (x) { return x.id === id; });
+  if (!o) return;
+  _moverId = id;
+
+  var el = document.getElementById('moverTarefa');
+  if (el) el.textContent = o.title + ' · hoje em ' + (o.local || '—');
+
+  // conta quantas tarefas cada setor já tem, para dar contexto na escolha
+  var cont = {};
+  orders.forEach(function (t) { var k = t.local || ''; if (k) cont[k] = (cont[k] || 0) + 1; });
+
+  var lista = document.getElementById('moverLista');
+  if (!lista) return;
+  lista.innerHTML = SETORES.map(function (st) {
+    var atual = normSetor(st) === normSetor(o.local || '');
+    return '<button type="button" class="mover-op' + (atual ? ' atual' : '') + '" data-setor="'
+      + String(st).replace(/"/g, '&quot;') + '">'
+      + (atual ? '✓ ' : '') + tituloSetor(st)
+      + '<span class="mv-n">' + (cont[st] || 0) + '</span></button>';
+  }).join('');
+
+  lista.querySelectorAll('.mover-op').forEach(function (b) {
+    b.addEventListener('click', function () { moverPara(b.getAttribute('data-setor')); });
+  });
+
+  document.getElementById('moverBack').classList.add('open');
+}
+
+function fecharMover() {
+  var b = document.getElementById('moverBack');
+  if (b) b.classList.remove('open');
+  _moverId = null;
+}
+
+async function moverPara(setorNovo) {
+  var id = _moverId;
+  var o = orders.find(function (x) { return x.id === id; });
+  fecharMover();
+  if (!o || !setorNovo) return;
+  if (normSetor(setorNovo) === normSetor(o.local || '')) return;   // já está lá
+
+  var antes = o.local;
+  o.local = setorNovo;
+  o.timeline.push({ time: 'Agora', text: 'Setor alterado de "' + antes + '" para "' + setorNovo + '"' });
+  renderKanban();
+  render();
+
+  if (o.fromFirebase && o.firestoreId) {
+    try {
+      await updateDoc(doc(db, 'planner', o.firestoreId), { setor: setorNovo });
+      if (typeof mostrarToast === 'function') mostrarToast('Movida', o.title + ' → ' + setorNovo, '');
+    } catch (err) {
+      console.log('Erro ao mover setor:', err);
+      o.local = antes;                 // não deixa a tela mentir
+      o.timeline.pop();
+      renderKanban();
+      render();
+      if (typeof mostrarToast === 'function') {
+        mostrarToast('Não salvou', 'Setor não foi gravado — ' + (err.code || err.message), '');
+      }
+    }
+  }
+}
+
+(function () {
+  var back = document.getElementById('moverBack');
+  var x = document.getElementById('moverFechar');
+  if (x) x.addEventListener('click', fecharMover);
+  if (back) back.addEventListener('click', function (e) { if (e.target === back) fecharMover(); });
+})();
 
 // === Navegação entre views ===
 // switchView consolidada abaixo (suporta home, kanban, agenda)
@@ -5231,6 +5360,18 @@ setInterval(updateGreeting, 60000);
 
 render();
 </script>
+<div class="mover-back" id="moverBack">
+  <div class="mover-folha" role="dialog" aria-label="Mover para outro setor">
+    <div class="mover-topo">
+      <div>
+        <div class="mover-tit">Mover para</div>
+        <div class="mover-sub" id="moverTarefa">—</div>
+      </div>
+      <button type="button" class="mover-x" id="moverFechar" aria-label="Fechar">✕</button>
+    </div>
+    <div class="mover-lista" id="moverLista"></div>
+  </div>
+</div>
 <div class="toast-container" id="toastContainer"></div>
 <div class="painel-lightbox" id="painel-lightbox" onclick="fecharLightboxPainel()">
   <button class="painel-lightbox-close" onclick="event.stopPropagation();fecharLightboxPainel()">✕</button>
