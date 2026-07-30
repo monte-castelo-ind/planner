@@ -2280,7 +2280,7 @@ select.cel-edit{ cursor:pointer; }
     <label class="filter-sel-wrap"><span class="filter-sel-label">Setor</span><select id="fSetor" class="filter-select"><option value="">Todos os setores</option></select></label>
     <label class="filter-sel-wrap"><span class="filter-sel-label">Prazo</span><select id="fPrazo" class="filter-select"><option value="all">Todos</option><option value="hoje">Hoje</option><option value="amanha">Amanhã</option><option value="semana">Esta semana</option><option value="mes">Este mês</option><option value="atrasadas">Atrasadas</option></select></label>
     <label class="filter-sel-wrap" id="ordenarWrap"><span class="filter-sel-label">Ordenar</span><select id="fOrdem" class="filter-select"></select><button type="button" id="fOrdemDir" class="ordem-dir" title="Inverter a ordem" aria-label="Inverter a ordem">↑</button></label>
-    <span class="atalhos-dica"><b>↑↓←→</b> navegar · <b>Shift+Espaço</b> linha · <b>F2</b> editar · <b>Enter</b> abrir · <b>Esc</b> fechar</span>
+    <span class="atalhos-dica"><b>↑↓←→</b> navegar · <b>Shift+Espaço</b> linha · <b>F2</b> editar · <b>Enter</b> abrir · <b>Ctrl+Enter</b> concluir · <b>Esc</b> fechar</span>
   </div>
   </div><!-- /#sharedFilters -->
 
@@ -2603,11 +2603,22 @@ document.addEventListener('keydown', function (e) {
   // o resto só vale na lista, fora de campo de texto e sem modal aberto
   if (ehCampo(e.target) || modalAberto()) return;
   if (document.body.classList.contains('kanban-mode') || document.body.classList.contains('agenda-mode')) return;
-  if (e.ctrlKey || e.metaKey || e.altKey) return;
-
   var linhas = gridLinhas();
   if (!linhas.length) return;
   var ultCol = COLUNAS.length - 1;
+
+  // Ctrl+Enter conclui (ou reabre) a tarefa selecionada, sem abrir o modal.
+  // Fica antes da guarda de Ctrl abaixo, senão nunca chegaria aqui.
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    if (grid.row < 0) return;
+    e.preventDefault();
+    var lc = linhas[grid.row];
+    var oc = lc && orders.find(function (x) { return x.id === lc.dataset.id; });
+    if (oc) alternarConclusao(oc);
+    return;
+  }
+
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
   var setas = ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'];
 
   if (setas.indexOf(e.key) >= 0) {
@@ -2749,6 +2760,40 @@ async function salvarCelula(valor, mover) {
     grid.col = Math.max(0, Math.min(COLUNAS.length - 1, grid.col + mover));
   }
   render();
+}
+
+// Conclui ou reabre pelo atalho. Otimista: pinta na tela na hora e
+// desfaz se o Firebase recusar.
+async function alternarConclusao(o) {
+  var antigo = o.status;
+  var novo = (o.status === 'done') ? 'open' : 'done';
+  o.status = novo;
+  o.timeline.push({
+    time: 'Agora',
+    text: (novo === 'done' ? 'Concluída' : 'Reaberta') + ' por atalho (Ctrl+Enter)'
+  });
+  render();
+
+  if (o.fromFirebase && o.firestoreId) {
+    try {
+      await updateDoc(doc(db, 'planner', o.firestoreId), {
+        status: (novo === 'done') ? 'concluido' : 'aberto'
+      });
+    } catch (err) {
+      console.log('Erro ao concluir:', err);
+      o.status = antigo;
+      o.timeline.pop();
+      render();
+      if (typeof mostrarToast === 'function') {
+        mostrarToast('Não salvou', 'Status não foi gravado — ' + (err.code || err.message), 'Ctrl+Enter');
+      }
+      return;
+    }
+  }
+  // Sem o aviso você não saberia se funcionou: a linha sai da lista ao concluir.
+  if (typeof mostrarToast === 'function') {
+    mostrarToast(novo === 'done' ? 'Tarefa concluída' : 'Tarefa reaberta', o.title, 'Ctrl+Enter');
+  }
 }
 
 // Grava um único campo. Cada caminho tem .catch visível e desfaz o local se falhar.
