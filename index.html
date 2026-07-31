@@ -2448,11 +2448,11 @@ select.cel-edit{ cursor:pointer; }
       </div>
       <div class="field-row">
         <div class="field">
-          <label class="field-label">Tipo</label>
-          <select id="newType">
-            <option value="os">Ordem de Serviço</option>
-            <option value="task">Tarefa</option>
-            <option value="prev">Preventiva</option>
+          <label class="field-label">Status</label>
+          <select id="newStatus">
+            <option value="aberto">Não iniciado</option>
+            <option value="andamento">Em andamento</option>
+            <option value="concluido">Concluído</option>
           </select>
         </div>
         <div class="field">
@@ -4039,7 +4039,7 @@ document.getElementById('saveNew').addEventListener('click', async () => {
   btn.disabled = true;
   btn.textContent = 'Salvando...';
 
-  const type = document.getElementById('newType').value;
+  const statusNovo = document.getElementById('newStatus').value;   // antes: 'tipo', lido e descartado
   const dlInput = document.getElementById('newDeadline').value;
   const local = document.getElementById('newLocal').value || 'A definir';
   const assignee = document.getElementById('newAssign').value;
@@ -4083,7 +4083,7 @@ document.getElementById('saveNew').addEventListener('click', async () => {
       setor: local,
       solicitante: assignee || 'Miguel K.',
       prioridade: prioridade,
-      status: 'aberto',
+      status: statusNovo,
       origem: 'painel',
       dataAbertura: dataAbertura,
       horaAbertura: horaAbertura,
@@ -4092,7 +4092,7 @@ document.getElementById('saveNew').addEventListener('click', async () => {
         data: dataAbertura,
         hora: horaAbertura,
         acao: 'Demanda criada pelo painel',
-        obs: ''
+        obs: 'Status inicial: ' + ({aberto:'Não iniciado', andamento:'Em andamento', concluido:'Concluído'}[statusNovo] || statusNovo)
       }],
       fotos: []
     });
@@ -4107,6 +4107,7 @@ document.getElementById('saveNew').addEventListener('click', async () => {
 
   document.getElementById('newTitle').value = '';
   document.getElementById('newLocal').selectedIndex = 0;
+  document.getElementById('newStatus').value = 'aberto';
   document.getElementById('newDesc').value = '';
   modalNew.classList.remove('open');
   btn.disabled = false;
