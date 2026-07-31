@@ -3278,7 +3278,6 @@ function aplicarRenome(tipo, idx, novo){
 
   if(!novo){ renderConfigLists(); return; }                 // vazio: desfaz
   if(novo===atual) return;                                   // nada mudou
-  if(tipo==='setor') novo = novo.toUpperCase();
 
   var dup = alvo.some(function(x,k){
     if(k===idx) return false;
@@ -3364,7 +3363,7 @@ window.openConfig = function(){ var e=document.getElementById('cfgSetorErro'); i
   var cfgBtn=document.getElementById('config-btn'); if(cfgBtn) cfgBtn.addEventListener('click', window.openConfig);
   var err=document.getElementById('cfgSetorErro');
   var inpS=document.getElementById('cfgNovoSetor');
-  function addSetor(){ var v=(inpS.value||'').trim().replace(/\s+/g,' ').toUpperCase(); if(err)err.textContent=''; if(!v){ if(err)err.textContent='Digite um setor.'; return; } if(SETORES.some(function(s){return normSetor(s)===normSetor(v);})){ if(err)err.textContent='Setor já existe.'; return; } SETORES.push(v); inpS.value=''; renderConfigLists(); inpS.focus(); }
+  function addSetor(){ var v=(inpS.value||'').trim().replace(/\s+/g,' '); if(err)err.textContent=''; if(!v){ if(err)err.textContent='Digite um setor.'; return; } if(SETORES.some(function(s){return normSetor(s)===normSetor(v);})){ if(err)err.textContent='Setor já existe.'; return; } SETORES.push(v); inpS.value=''; renderConfigLists(); inpS.focus(); }
   var addS=document.getElementById('cfgAddSetor'); if(addS) addS.addEventListener('click', addSetor);
   if(inpS) inpS.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); addSetor(); } });
   var inpR=document.getElementById('cfgNovoResp');
