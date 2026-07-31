@@ -2368,7 +2368,7 @@ select.cel-edit{ cursor:pointer; }
       </div>
     </div>
     <label class="filter-sel-wrap" id="ordenarWrap"><span class="filter-sel-label">Ordenar</span><select id="fOrdem" class="filter-select"></select><button type="button" id="fOrdemDir" class="ordem-dir" title="Inverter a ordem" aria-label="Inverter a ordem">↑</button></label>
-    <span class="atalhos-dica"><b>↑↓←→</b> navegar · <b>Shift+Espaço</b> linha · <b>F2</b> editar · <b>Enter</b> abrir · <b>Ctrl+Enter</b> concluir · <b>Esc</b> fechar</span>
+    <span class="atalhos-dica"><b>↑↓←→</b> navegar · <b>Shift+Espaço</b> linha · <b>F2</b> editar · <b>Enter</b> abrir · <b>Ctrl+Enter</b> concluir · <b>Ctrl+*</b> nova · <b>Esc</b> fechar</span>
   </div>
   </div><!-- /#sharedFilters -->
 
@@ -2688,6 +2688,16 @@ document.addEventListener('keydown', function (e) {
     var m = modalAberto();
     if (m) { e.preventDefault(); m.classList.remove('open'); return; }
     if (grid.row >= 0) { e.preventDefault(); grid.row = -1; grid.col = -1; grid.modo = 'celula'; aplicarCursor(); }
+    return;
+  }
+
+  // Ctrl+* abre a Nova Demanda de qualquer lugar (lista, Kanban ou Agenda),
+  // inclusive com o cursor na busca — por isso vem antes da guarda de campo.
+  // e.key === '*' cobre tanto o Shift+8 quanto o * do teclado numérico.
+  if ((e.ctrlKey || e.metaKey) && e.key === '*') {
+    if (modalAberto() || document.querySelector('.mover-back.open')) return;
+    e.preventDefault();
+    abrirNovaDemanda();
     return;
   }
 
@@ -4002,12 +4012,16 @@ document.querySelectorAll('.stat[data-stat-filter]').forEach(s => {
 });
 
 const modalNew = document.getElementById('modalNew');
-document.getElementById('fabNew').addEventListener('click', () => {
+function abrirNovaDemanda() {
   modalNew.classList.add('open');
   const d = new Date(Date.now() + 4*60*60*1000);
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
   document.getElementById('newDeadline').value = d.toISOString().slice(0,16);
-});
+  // já deixa o cursor no título: antes era preciso um clique extra, até pelo FAB
+  const t = document.getElementById('newTitle');
+  if (t) setTimeout(function () { t.focus(); t.select(); }, 30);
+}
+document.getElementById('fabNew').addEventListener('click', abrirNovaDemanda);
 document.querySelectorAll('[data-close]').forEach(b => {
   b.addEventListener('click', () => {
     document.querySelectorAll('.modal-backdrop').forEach(m => m.classList.remove('open'));
