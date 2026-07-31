@@ -2996,6 +2996,10 @@ let SETORES = SETORES_PADRAO.slice();
 const RESPONSAVEIS_PADRAO = ["DOUGLAS","Miguel Kerpel","CLAUDIO","Lauri","RICARDO MANUTENÇÃO","christopher","MAICON","LEANDRO","TABORDA","CLODOALDO","CELSO","ERICK","Patrick Embalação","Antonio Câmeras","TERCEIRIZADO","Daniel TI","GABRIELA","Thiago Mc","Jonathan Thomé","João Thomé","Vitor (caseiro)","tecnica segurança","PPCI","DMAE","Não atribuído"];
 let RESPONSAVEIS = RESPONSAVEIS_PADRAO.slice();
 let ROTULOS = []; // [{nome, cor}]
+// Renomeações pendentes das listas de Configuração. Precisa nascer AQUI:
+// a IIFE logo abaixo chama renderConfigLists(), que já consulta este objeto.
+// Declarado depois, 'var' içaria o nome mas não o valor -> undefined[tipo] estoura.
+var RENOMEIOS = { setor: [], resp: [], rot: [] };
 function normNome(s){ return (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim(); }
 function tituloSetor(s){ return (s||'').toString().split('/').map(function(p){ p=p.trim(); return p.charAt(0)+p.slice(1).toLowerCase(); }).join('/'); }
 function optionsSetores(sel){ var out=''; SETORES.forEach(function(s){ out += '<option value="'+s+'"'+(normSetor(s)===normSetor(sel)?' selected':'')+'>'+s+'</option>'; }); return out; }
@@ -3195,8 +3199,6 @@ function syncOrdemUI(){
    rótulos. Trocar só a lista deixaria as tarefas apontando para um nome que não
    existe mais (sai do filtro, cai em "SEM SETOR" no Kanban). Então cada renome
    fica pendente aqui e, no Salvar, é aplicado também nas tarefas afetadas. */
-var RENOMEIOS = { setor: [], resp: [], rot: [] };
-
 // quantas tarefas usam este valor hoje
 function usoDe(tipo, valor){
   if(!valor) return 0;
