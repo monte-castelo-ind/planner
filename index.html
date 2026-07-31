@@ -2567,6 +2567,8 @@ select.cel-edit{ cursor:pointer; }
         </div>
         <div id="cfgSetorErro" style="color:var(--red);font-size:12px;min-height:15px;margin-top:8px;"></div>
       </div>
+      <div id="cfgAvisoRenome" style="display:none;background:rgba(245,176,19,.09);border:1px solid rgba(245,176,19,.35);padding:12px 14px;border-radius:8px;font-size:13px;line-height:1.5;margin-bottom:14px;"></div>
+
       <div class="btn-row">
         <button class="btn btn-secondary" id="cfgRestaurar">Restaurar padrão</button>
         <button class="btn btn-primary" id="cfgSalvar">Salvar</button>
@@ -3188,24 +3190,174 @@ function syncOrdemUI(){
   }
 }
 // ---- Listas do modal de Configurações ----
-function _cfgRow(label, rmAttr, idx, swatch){
-  return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--bg-2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;">'
-    + '<span style="display:flex;align-items:center;gap:8px;font-size:12px;">'+(swatch||'')+'<span>'+label+'</span></span>'
-    + '<button type="button" '+rmAttr+'="'+idx+'" title="Remover" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:15px;line-height:1;">✕</button>'
+/* ===== Listas de Configuração: adicionar, renomear e remover =====
+   Renomear é delicado: a tarefa guarda o TEXTO do setor, do responsável e dos
+   rótulos. Trocar só a lista deixaria as tarefas apontando para um nome que não
+   existe mais (sai do filtro, cai em "SEM SETOR" no Kanban). Então cada renome
+   fica pendente aqui e, no Salvar, é aplicado também nas tarefas afetadas. */
+var RENOMEIOS = { setor: [], resp: [], rot: [] };
+
+// quantas tarefas usam este valor hoje
+function usoDe(tipo, valor){
+  if(!valor) return 0;
+  if(tipo==='setor') return orders.filter(function(o){ return normSetor(o.local||'')===normSetor(valor); }).length;
+  if(tipo==='resp')  return orders.filter(function(o){ return normNome(o.assignee||'')===normNome(valor); }).length;
+  return orders.filter(function(o){ return (o.rotulos||[]).some(function(r){ return normNome(r)===normNome(valor); }); }).length;
+}
+
+// se o item tem renome pendente, conta pelo nome de ORIGEM: as tarefas
+// ainda estão com ele, e mostrar 0 aqui daria a impressão de que ninguém usa
+function origemDe(tipo, atual){
+  var r = RENOMEIOS[tipo].filter(function(x){ return x[1]===atual; })[0];
+  return r ? r[0] : atual;
+}
+
+function _cfgRow(tipo, idx, texto, mono, cor){
+  var n = usoDe(tipo, origemDe(tipo, texto));
+  var sw = (cor!=null)
+    ? '<input type="color" value="'+cor+'" data-cor="'+tipo+'" data-i="'+idx+'" title="Cor do rótulo" style="width:26px;height:26px;padding:1px;border:1px solid var(--line-2);border-radius:5px;background:none;cursor:pointer;flex:0 0 auto;">'
+    : '';
+  return '<div style="display:flex;align-items:center;gap:8px;background:var(--bg-2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;">'
+    + sw
+    + '<input type="text" value="'+String(texto).replace(/"/g,'&quot;')+'" data-nome="'+tipo+'" data-i="'+idx+'"'
+    + ' style="flex:1;min-width:0;background:none;border:none;border-bottom:1px dashed transparent;color:var(--ink);'
+    + (mono?'font-family:var(--mono);letter-spacing:.05em;':'font-family:var(--sans);')
+    + 'font-size:13px;padding:3px 2px;outline:none;">'
+    + '<span style="flex:0 0 auto;font-family:var(--mono);font-size:9px;letter-spacing:.1em;color:var(--ink-faint);white-space:nowrap;" title="tarefas usando">'+(n||'—')+'</span>'
+    + '<button type="button" data-rm="'+tipo+'" data-i="'+idx+'" title="Remover" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:15px;line-height:1;flex:0 0 auto;">✕</button>'
     + '</div>';
 }
-function renderConfigLists(){
-  var bs=document.getElementById('cfgSetoresList');
-  if(bs){ bs.innerHTML = SETORES.length ? SETORES.map(function(s,i){ return _cfgRow('<span style="font-family:var(--mono);letter-spacing:.05em;">'+s+'</span>','data-rm-setor',i); }).join('') : '<div style="font-size:12px;color:var(--ink-mute);">Nenhum setor.</div>';
-    bs.querySelectorAll('[data-rm-setor]').forEach(function(b){ b.addEventListener('click', function(){ SETORES.splice(parseInt(this.getAttribute('data-rm-setor'),10),1); renderConfigLists(); }); }); }
-  var br=document.getElementById('cfgRespList');
-  if(br){ br.innerHTML = RESPONSAVEIS.length ? RESPONSAVEIS.map(function(s,i){ return _cfgRow(s,'data-rm-resp',i); }).join('') : '<div style="font-size:12px;color:var(--ink-mute);">Nenhum responsável.</div>';
-    br.querySelectorAll('[data-rm-resp]').forEach(function(b){ b.addEventListener('click', function(){ RESPONSAVEIS.splice(parseInt(this.getAttribute('data-rm-resp'),10),1); renderConfigLists(); }); }); }
-  var bl=document.getElementById('cfgRotulosList');
-  if(bl){ bl.innerHTML = ROTULOS.length ? ROTULOS.map(function(r,i){ var sw='<span style="width:14px;height:14px;border-radius:4px;display:inline-block;background:'+r.cor+';border:1px solid var(--line-2);"></span>'; return _cfgRow('<span>'+r.nome+'</span>','data-rm-rot',i,sw); }).join('') : '<div style="font-size:12px;color:var(--ink-mute);">Nenhum rótulo.</div>';
-    bl.querySelectorAll('[data-rm-rot]').forEach(function(b){ b.addEventListener('click', function(){ ROTULOS.splice(parseInt(this.getAttribute('data-rm-rot'),10),1); renderConfigLists(); }); }); }
+
+function _cfgLista(elId, tipo, arr, pegaTexto, mono, pegaCor){
+  var box=document.getElementById(elId);
+  if(!box) return;
+  if(!arr.length){ box.innerHTML='<div style="font-size:12px;color:var(--ink-mute);">Nenhum item.</div>'; return; }
+  box.innerHTML = arr.map(function(x,i){
+    return _cfgRow(tipo, i, pegaTexto(x), mono, pegaCor?pegaCor(x):null);
+  }).join('');
+
+  // renomear: registra o de-para e aplica na lista local
+  box.querySelectorAll('[data-nome="'+tipo+'"]').forEach(function(inp){
+    inp.addEventListener('focus', function(){ inp.style.borderBottomColor='var(--line-2)'; });
+    inp.addEventListener('blur',  function(){ inp.style.borderBottomColor='transparent'; aplicarRenome(tipo, parseInt(inp.getAttribute('data-i'),10), inp.value); });
+    inp.addEventListener('keydown', function(ev){
+      if(ev.key==='Enter'){ ev.preventDefault(); inp.blur(); }
+      else if(ev.key==='Escape'){ ev.preventDefault(); renderConfigLists(); }
+    });
+  });
+  // cor do rótulo
+  box.querySelectorAll('[data-cor="'+tipo+'"]').forEach(function(c){
+    c.addEventListener('change', function(){
+      var k=parseInt(c.getAttribute('data-i'),10);
+      if(ROTULOS[k]) ROTULOS[k].cor=c.value;
+    });
+  });
+  // remover
+  box.querySelectorAll('[data-rm="'+tipo+'"]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var k=parseInt(b.getAttribute('data-i'),10);
+      var alvo = (tipo==='setor')?SETORES:(tipo==='resp')?RESPONSAVEIS:ROTULOS;
+      var nome = (tipo==='rot') ? (alvo[k]&&alvo[k].nome) : alvo[k];
+      var n = usoDe(tipo, nome);
+      if(n>0 && !confirm('"'+nome+'" está em '+n+' tarefa(s).\n\nRemover da lista NÃO altera essas tarefas — elas continuam com esse nome, mas ele deixa de aparecer nos filtros.\n\nRemover mesmo assim?')) return;
+      alvo.splice(k,1);
+      renderConfigLists();
+    });
+  });
 }
-window.openConfig = function(){ var e=document.getElementById('cfgSetorErro'); if(e) e.textContent=''; renderConfigLists(); document.getElementById('modalConfig').classList.add('open'); };
+
+function aplicarRenome(tipo, idx, novo){
+  novo = (novo||'').trim().replace(/\s+/g,' ');
+  var alvo = (tipo==='setor')?SETORES:(tipo==='resp')?RESPONSAVEIS:ROTULOS;
+  var atual = (tipo==='rot') ? (alvo[idx]&&alvo[idx].nome) : alvo[idx];
+  if(atual===undefined) return;
+  var err=document.getElementById('cfgSetorErro');
+  if(err) err.textContent='';
+
+  if(!novo){ renderConfigLists(); return; }                 // vazio: desfaz
+  if(novo===atual) return;                                   // nada mudou
+  if(tipo==='setor') novo = novo.toUpperCase();
+
+  var dup = alvo.some(function(x,k){
+    if(k===idx) return false;
+    var t=(tipo==='rot')?x.nome:x;
+    return (tipo==='setor'? normSetor(t)===normSetor(novo) : normNome(t)===normNome(novo));
+  });
+  if(dup){ if(err) err.textContent='"'+novo+'" já existe na lista.'; renderConfigLists(); return; }
+
+  if(tipo==='rot') alvo[idx].nome=novo; else alvo[idx]=novo;
+
+  // encadeia renomes: se A->B e depois B->C, a origem continua sendo A
+  var fila=RENOMEIOS[tipo];
+  var ant=fila.filter(function(r){ return r[1]===atual; })[0];
+  if(ant) ant[1]=novo; else fila.push([atual, novo]);
+
+  renderConfigLists();
+  atualizarAvisoRenome();
+}
+
+function totalTarefasAfetadas(){
+  var n=0;
+  ['setor','resp','rot'].forEach(function(t){
+    RENOMEIOS[t].forEach(function(r){ n += usoDe(t, r[0]); });
+  });
+  return n;
+}
+
+function atualizarAvisoRenome(){
+  var el=document.getElementById('cfgAvisoRenome');
+  if(!el) return;
+  var lista=[];
+  ['setor','resp','rot'].forEach(function(t){
+    RENOMEIOS[t].forEach(function(r){
+      var n=usoDe(t, r[0]);
+      lista.push('<div style="margin-top:4px;">“'+r[0]+'” → <b>'+r[1]+'</b>'+(n?' <span style="color:var(--ink-faint)">('+n+' tarefa'+(n>1?'s':'')+')</span>':'')+'</div>');
+    });
+  });
+  if(!lista.length){ el.style.display='none'; el.innerHTML=''; return; }
+  var tot=totalTarefasAfetadas();
+  el.style.display='block';
+  el.innerHTML='<b>Renomeações pendentes</b>'+lista.join('')
+    + '<div style="margin-top:8px;font-size:12px;">Ao salvar, '+(tot?('<b>'+tot+' tarefa'+(tot>1?'s':'')+'</b> ser'+(tot>1?'ão':'á')+' atualizada'+(tot>1?'s':'')):'nenhuma tarefa precisa mudar')+'.</div>';
+}
+
+// aplica os renomes nas tarefas, uma a uma, com .catch visível
+async function migrarTarefas(){
+  var erros=0, feitas=0;
+  for (var ti=0; ti<3; ti++){
+    var tipo=['setor','resp','rot'][ti];
+    for (var ri=0; ri<RENOMEIOS[tipo].length; ri++){
+      var de=RENOMEIOS[tipo][ri][0], para=RENOMEIOS[tipo][ri][1];
+      var alvos = orders.filter(function(o){
+        if(tipo==='setor') return normSetor(o.local||'')===normSetor(de);
+        if(tipo==='resp')  return normNome(o.assignee||'')===normNome(de);
+        return (o.rotulos||[]).some(function(r){ return normNome(r)===normNome(de); });
+      });
+      for (var ai=0; ai<alvos.length; ai++){
+        var o=alvos[ai], upd=null;
+        if(tipo==='setor'){ o.local=para; upd={ setor:para }; }
+        else if(tipo==='resp'){ o.assignee=para; upd={ solicitante:para }; }
+        else {
+          o.rotulos=(o.rotulos||[]).map(function(r){ return normNome(r)===normNome(de) ? para : r; });
+          upd={ rotulos:o.rotulos.slice() };
+        }
+        if(o.fromFirebase && o.firestoreId && upd){
+          try { await updateDoc(doc(db,'planner',o.firestoreId), upd); feitas++; }
+          catch(e){ erros++; console.log('Erro ao migrar', o.id, e); }
+        }
+      }
+    }
+  }
+  return { feitas: feitas, erros: erros };
+}
+
+function renderConfigLists(){
+  _cfgLista('cfgSetoresList','setor',SETORES, function(x){return x;}, true);
+  _cfgLista('cfgRespList','resp',RESPONSAVEIS, function(x){return x;}, false);
+  _cfgLista('cfgRotulosList','rot',ROTULOS, function(x){return x.nome;}, false, function(x){return x.cor;});
+  atualizarAvisoRenome();
+}
+window.openConfig = function(){ var e=document.getElementById('cfgSetorErro'); if(e) e.textContent=''; RENOMEIOS={ setor:[], resp:[], rot:[] }; renderConfigLists(); document.getElementById('modalConfig').classList.add('open'); };
 (function(){
   var cfgBtn=document.getElementById('config-btn'); if(cfgBtn) cfgBtn.addEventListener('click', window.openConfig);
   var err=document.getElementById('cfgSetorErro');
@@ -3221,19 +3373,35 @@ window.openConfig = function(){ var e=document.getElementById('cfgSetorErro'); i
   function addRot(){ var v=(inpL.value||'').trim().replace(/\s+/g,' '); var c=(inpC&&inpC.value)||'#B07D4C'; if(err)err.textContent=''; if(!v){ if(err)err.textContent='Digite um rótulo.'; return; } if(ROTULOS.some(function(r){return normNome(r.nome)===normNome(v);})){ if(err)err.textContent='Rótulo já existe.'; return; } ROTULOS.push({nome:v,cor:c}); inpL.value=''; renderConfigLists(); inpL.focus(); }
   var addL=document.getElementById('cfgAddRotulo'); if(addL) addL.addEventListener('click', addRot);
   if(inpL) inpL.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); addRot(); } });
-  var rest=document.getElementById('cfgRestaurar'); if(rest) rest.addEventListener('click', function(){ SETORES=SETORES_PADRAO.slice(); RESPONSAVEIS=RESPONSAVEIS_PADRAO.slice(); ROTULOS=[]; renderConfigLists(); if(err)err.textContent=''; });
+  var rest=document.getElementById('cfgRestaurar'); if(rest) rest.addEventListener('click', function(){ SETORES=SETORES_PADRAO.slice(); RESPONSAVEIS=RESPONSAVEIS_PADRAO.slice(); ROTULOS=[]; RENOMEIOS={ setor:[], resp:[], rot:[] }; renderConfigLists(); if(err)err.textContent=''; });
   var save=document.getElementById('cfgSalvar');
   if(save) save.addEventListener('click', function(){
     var btn=this; if(err)err.textContent='';
     if(!SETORES.length){ if(err)err.textContent='Adicione ao menos um setor.'; return; }
+    var _af=totalTarefasAfetadas();
+    if(_af>0 && !confirm('Salvar vai renomear também em '+_af+' tarefa(s).\n\nContinuar?')) return;
     btn.disabled=true; var _t=btn.textContent; btn.textContent='Salvando…';
     setDoc(doc(db,'planner','_config'), { setores: SETORES.slice(), responsaveis: RESPONSAVEIS.slice(), rotulos: ROTULOS.slice(), __config:true }, { merge:true })
+      .then(function(){
+        // config primeiro: se a migração falhar no meio, a lista nova já está salva
+        if(_af>0){ btn.textContent='Atualizando tarefas…'; return migrarTarefas(); }
+        return { feitas:0, erros:0 };
+      })
+      .then(function(res){
+        RENOMEIOS={ setor:[], resp:[], rot:[] };
+        if(res && res.erros>0 && typeof mostrarToast==='function'){
+          mostrarToast('Atenção', res.erros+' tarefa(s) não foram atualizadas — veja o console.', '');
+        } else if(res && res.feitas>0 && typeof mostrarToast==='function'){
+          mostrarToast('Renomeado', res.feitas+' tarefa(s) atualizadas.', '');
+        }
+        return null;
+      })
       .then(function(){ renderConfigUI(); if(typeof render==='function') render(); document.getElementById('modalConfig').classList.remove('open'); if(typeof mostrarToast==='function') mostrarToast('Configurações','Salvo com sucesso.',''); })
       .catch(function(e){ if(err) err.textContent='Erro ao salvar: '+((e&&(e.code||e.message))||e); console.log('Erro salvar config:', e); })
       .then(function(){ btn.disabled=false; btn.textContent=_t; });
   });
   var mc=document.getElementById('modalConfig');
-  if(mc) mc.addEventListener('click', function(e){ if(e.target===mc || (e.target.closest && e.target.closest('[data-close]'))) mc.classList.remove('open'); });
+  if(mc) mc.addEventListener('click', function(e){ if(e.target===mc || (e.target.closest && e.target.closest('[data-close]'))){ RENOMEIOS={ setor:[], resp:[], rot:[] }; mc.classList.remove('open'); } });
 })();
 function normSetor(s){ return (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim(); }
 function bucketMatch(local, bucket){ if(!bucket) return true; let L=normSetor(local); const base=L.split('·')[0].trim(); const B=normSetor(bucket); if(L===B||base===B) return true; const bp=B.split('/').map(x=>x.trim()), lp=base.split('/').map(x=>x.trim()); return bp.some(b=>lp.includes(b)); }
