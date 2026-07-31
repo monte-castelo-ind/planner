@@ -2368,7 +2368,7 @@ select.cel-edit{ cursor:pointer; }
       </div>
     </div>
     <label class="filter-sel-wrap" id="ordenarWrap"><span class="filter-sel-label">Ordenar</span><select id="fOrdem" class="filter-select"></select><button type="button" id="fOrdemDir" class="ordem-dir" title="Inverter a ordem" aria-label="Inverter a ordem">↑</button></label>
-    <span class="atalhos-dica"><b>↑↓←→</b> navegar · <b>Shift+Espaço</b> linha · <b>F2</b> editar · <b>Enter</b> abrir · <b>Ctrl+Enter</b> concluir · <b>Ctrl+*</b> nova · <b>Esc</b> fechar</span>
+    <span class="atalhos-dica"><b>↑↓←→</b> navegar · <b>Shift+Espaço</b> linha · <b>F2</b> editar · <b>Enter</b> abrir · <b>Ctrl+Enter</b> concluir · <b>Ctrl+*</b> nova · <b>Ctrl+Z</b> desfazer · <b>Esc</b> fechar</span>
   </div>
   </div><!-- /#sharedFilters -->
 
@@ -2615,7 +2615,7 @@ orders.forEach(o => {
 });
 
 let state = { tab: 'all', filter: 'all', bucket: null, search: '', shown: 60, periodo: 'all', periodoCampo: 'deadline', sortKey: null, sortDir: 'asc',
-  filtros: { status: [], prio: [], prazo: [], assignee: [], setor: [], rotulo: [] } };
+  filtros: { status: [], prio: [], prazo: [], concl: [], assignee: [], setor: [], rotulo: [] } };
 
 // ===== Ordenação da tabela =====
 // Fonte única: cabeçalho e ordenação saem daqui, então não podem divergir.
@@ -2691,6 +2691,19 @@ document.addEventListener('keydown', function (e) {
     if (m) { e.preventDefault(); m.classList.remove('open'); return; }
     if (grid.row >= 0) { e.preventDefault(); grid.row = -1; grid.col = -1; grid.modo = 'celula'; aplicarCursor(); }
     return;
+  }
+
+  // Ctrl+Z / Ctrl+Y (e Ctrl+Shift+Z) desfazem e refazem a última ação.
+  // Dentro de campo de texto NÃO intercepta: ali o Ctrl+Z tem que desfazer
+  // a digitação, que é o que a pessoa espera.
+  if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+    var _k = (e.key || '').toLowerCase();
+    if (_k === 'z' || _k === 'y') {
+      if (ehCampo(e.target)) return;          // deixa o navegador cuidar do texto
+      e.preventDefault();
+      if (_k === 'y' || e.shiftKey) refazer(); else desfazer();
+      return;
+    }
   }
 
   // Ctrl+* abre a Nova Demanda de qualquer lugar (lista, Kanban ou Agenda),
@@ -2877,14 +2890,21 @@ async function alternarConclusao(o) {
   });
   render();
 
+  // fecha -> marca a hora real; reabre -> limpa, senão ficaria uma data mentindo
+  var _cAntes = o.concluidoEm || null;
+  o.concluidoEm = (novo === 'done') ? new Date() : null;
+
   if (o.fromFirebase && o.firestoreId) {
     try {
       await updateDoc(doc(db, 'planner', o.firestoreId), {
-        status: (novo === 'done') ? 'concluido' : 'aberto'
+        status: (novo === 'done') ? 'concluido' : 'aberto',
+        concluidoEm: (novo === 'done') ? fmtConcluidoEm(o.concluidoEm) : null
       });
+      registrarStatus(o.firestoreId, o.title, antigo, novo, _cAntes);
     } catch (err) {
       console.log('Erro ao concluir:', err);
       o.status = antigo;
+      o.concluidoEm = _cAntes;
       o.timeline.pop();
       render();
       if (typeof mostrarToast === 'function') {
@@ -2897,6 +2917,88 @@ async function alternarConclusao(o) {
   if (typeof mostrarToast === 'function') {
     mostrarToast(novo === 'done' ? 'Tarefa concluída' : 'Tarefa reaberta', o.title, 'Ctrl+Enter');
   }
+}
+
+/* ---------- histórico: registrar, desfazer, refazer ---------- */
+function achaPorFsId(fid){
+  for (var i=0;i<orders.length;i++){ if(orders[i].firestoreId===fid) return orders[i]; }
+  return null;
+}
+
+function registrarAcao(a){
+  HIST.acoes = HIST.acoes.slice(0, HIST.pos + 1);   // desfez e fez outra coisa: descarta o "futuro"
+  HIST.acoes.push(a);
+  if (HIST.acoes.length > HIST_MAX) HIST.acoes.shift();
+  HIST.pos = HIST.acoes.length - 1;
+}
+
+function avisoHist(titulo, texto){
+  if (typeof mostrarToast === 'function') mostrarToast(titulo, texto || '', 'Ctrl+Z / Ctrl+Y');
+}
+
+async function desfazer(){
+  if (HIST.ocupado) return;
+  if (HIST.pos < 0) { avisoHist('Nada para desfazer'); return; }
+  var a = HIST.acoes[HIST.pos];
+  HIST.ocupado = true;
+  try {
+    await a.desfazer();
+    HIST.pos--;
+    avisoHist('Desfeito', a.texto);
+  } catch (err) {
+    console.log('Erro ao desfazer:', err);
+    avisoHist('Não desfez', (err.code || err.message));
+  }
+  HIST.ocupado = false;
+  render();
+  if (document.body.classList.contains('kanban-mode')) renderKanban();
+  if (document.body.classList.contains('agenda-mode')) renderAgenda();
+}
+
+async function refazer(){
+  if (HIST.ocupado) return;
+  if (HIST.pos >= HIST.acoes.length - 1) { avisoHist('Nada para refazer'); return; }
+  var a = HIST.acoes[HIST.pos + 1];
+  HIST.ocupado = true;
+  try {
+    await a.refazer();
+    HIST.pos++;
+    avisoHist('Refeito', a.texto);
+  } catch (err) {
+    console.log('Erro ao refazer:', err);
+    avisoHist('Não refez', (err.code || err.message));
+  }
+  HIST.ocupado = false;
+  render();
+  if (document.body.classList.contains('kanban-mode')) renderKanban();
+  if (document.body.classList.contains('agenda-mode')) renderAgenda();
+}
+
+// grava um status pelo id, buscando o objeto atual na hora
+var _FB_ST = { open:'aberto', progress:'andamento', done:'concluido',
+               waiting_part:'aguardando_peca', waiting_auth:'aguardando_autorizacao', paused:'pausada' };
+// grava status e, junto, o concluidoEm correspondente
+async function gravarStatusPorId(fid, st, cEm){
+  var o = achaPorFsId(fid);
+  var valor = (st === 'done') ? (cEm || new Date()) : null;
+  if (o) { o.status = st; o.concluidoEm = valor; }
+  await updateDoc(doc(db, 'planner', fid), {
+    status: _FB_ST[st] || 'aberto',
+    concluidoEm: valor ? fmtConcluidoEm(valor) : null
+  });
+}
+
+// registra uma mudança de status como ação desfazível.
+// Guarda o concluidoEm anterior: desfazer uma reabertura tem que devolver
+// a data original, não inventar a de agora.
+function registrarStatus(fid, titulo, antigo, novo, cAntes){
+  if (!fid) return;                       // tarefa histórica, sem doc no Firebase
+  var cNovo = (novo === 'done') ? new Date() : null;
+  registrarAcao({
+    texto: statusLabel(novo).toLowerCase() + ' — "' + titulo + '"',
+    desfazer: function(){ return gravarStatusPorId(fid, antigo, cAntes); },
+    refazer:  function(){ return gravarStatusPorId(fid, novo, cNovo); }
+  });
 }
 
 // Grava um único campo. Cada caminho tem .catch visível e desfaz o local se falhar.
@@ -3000,6 +3102,13 @@ let ROTULOS = []; // [{nome, cor}]
 // a IIFE logo abaixo chama renderConfigLists(), que já consulta este objeto.
 // Declarado depois, 'var' içaria o nome mas não o valor -> undefined[tipo] estoura.
 var RENOMEIOS = { setor: [], resp: [], rot: [] };
+
+/* ===== Desfazer / Refazer (Ctrl+Z / Ctrl+Y) =====
+   As ações NÃO guardam referência ao objeto da tarefa: o onSnapshot recria
+   todos os objetos de orders a cada mudança, então uma referência velha
+   apontaria para um fantasma. Guardam o firestoreId e buscam na hora. */
+var HIST = { acoes: [], pos: -1, ocupado: false };
+var HIST_MAX = 30;
 function normNome(s){ return (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim(); }
 function tituloSetor(s){ return (s||'').toString().split('/').map(function(p){ p=p.trim(); return p.charAt(0)+p.slice(1).toLowerCase(); }).join('/'); }
 function optionsSetores(sel){ var out=''; SETORES.forEach(function(s){ out += '<option value="'+s+'"'+(normSetor(s)===normSetor(sel)?' selected':'')+'>'+s+'</option>'; }); return out; }
@@ -3044,6 +3153,7 @@ var GRUPOS = [
   { key:'status',   label:'Status' },
   { key:'prio',     label:'Prioridade' },
   { key:'prazo',    label:'Prazo' },
+  { key:'concl',    label:'Concluído em' },
   { key:'assignee', label:'Atribuída a' },
   { key:'setor',    label:'Bucket / Setor' },
   { key:'rotulo',   label:'Rótulos' }
@@ -3056,6 +3166,8 @@ var STATUS_OPTS = [
 var PRIO_OPTS  = [['crit','Crítica'], ['high','Alta'], ['med','Média'], ['low','Baixa']];
 var PRAZO_OPTS = [['hoje','Hoje'], ['amanha','Amanhã'], ['semana','Esta semana'],
                   ['mes','Este mês'], ['atrasadas','Atrasadas']];
+// "atrasadas" não faz sentido aqui: é sobre quando fechou, não sobre prazo
+var CONCL_OPTS = [['hoje','Hoje'], ['semana','Esta semana'], ['mes','Este mês']];
 
 // conta quantas tarefas cairiam em cada opção, ignorando o próprio grupo
 // (senão marcar uma opção zeraria a contagem das outras do mesmo grupo)
@@ -3089,6 +3201,15 @@ function opcoesDoGrupo(g) {
       var n = base.filter(function (o) { return matchPeriodo(o, p[0], 'deadline'); }).length;
       return [p[0], p[1], n];
     }).filter(function (p) { return p[2] > 0; });
+  }
+  if (g === 'concl') {
+    var salvoC = state.filtros.concl; state.filtros.concl = [];
+    var baseC = orders.filter(function (o) { return passaFiltros(o, { incluirConcluidas: true }); });
+    state.filtros.concl = salvoC;
+    return CONCL_OPTS.map(function (pz) {
+      var n = baseC.filter(function (o) { return o.concluidoEm && matchPeriodo(o, pz[0], 'concluidoEm'); }).length;
+      return [pz[0], pz[1], n];
+    }).filter(function (x) { return x[2] > 0; });
   }
   if (g === 'assignee') {
     var ca = contarOpcoes('assignee', null, function (o) { return o.assignee || 'Não atribuído'; });
@@ -3605,6 +3726,66 @@ function bindPrazoEditor(orderId) {
   });
 }
 
+/* ---------- correção da data de conclusão ---------- */
+function bindConcluidoEmEditor(orderId) {
+  const safeId = orderId.replace(/[^a-zA-Z0-9]/g, '_');
+  const editBtn = document.querySelector('[data-edit-cem="' + orderId + '"]');
+  const saveBtn = document.querySelector('[data-save-cem="' + orderId + '"]');
+  const input   = document.querySelector('[data-cem-input="' + orderId + '"]');
+  const viewB   = document.getElementById('cemView_' + safeId);
+  const editB   = document.getElementById('cemEdit_' + safeId);
+  if (!editBtn || !saveBtn || !input) return;
+
+  editBtn.addEventListener('click', function () {
+    viewB.style.display = 'none';
+    editB.style.display = 'block';
+    if (!input.value) input.value = toLocalDatetime(new Date());
+    input.focus();
+  });
+  saveBtn.addEventListener('click', function () { salvarConcluidoEm(orderId, input.value); });
+  input.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') { ev.preventDefault(); salvarConcluidoEm(orderId, input.value); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); viewB.style.display = 'flex'; editB.style.display = 'none'; }
+  });
+  document.querySelectorAll('[data-cem-quick="' + orderId + '"]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      const q = b.getAttribute('data-q');
+      if (q === 'cancel') { viewB.style.display = 'flex'; editB.style.display = 'none'; return; }
+      const agora = new Date();
+      if (q === 'ontem') agora.setDate(agora.getDate() - 1);
+      salvarConcluidoEm(orderId, toLocalDatetime(agora));
+    });
+  });
+}
+
+async function salvarConcluidoEm(orderId, valor) {
+  const o = orders.find(x => x.id === orderId);
+  if (!o || !valor) return;
+  const nova = new Date(valor);
+  if (isNaN(nova.getTime())) return;
+
+  const antes = o.concluidoEm ? fmtConcluidoEm(o.concluidoEm) : 'não registrado';
+  if (fmtConcluidoEm(nova) === fmtConcluidoEm(o.concluidoEm)) { openDetail(orderId); return; }
+
+  const anterior = o.concluidoEm || null;
+  o.concluidoEm = nova;
+  // marca que foi ajuste manual: campo de registro editado merece rastro
+  o.timeline.push({ time: 'Agora', text: 'Data de conclusão ajustada de "' + antes + '" para "' + fmtConcluidoEm(nova) + '" (manual)' });
+
+  if (o.fromFirebase && o.firestoreId) {
+    try {
+      await updateDoc(doc(db, 'planner', o.firestoreId), { concluidoEm: fmtConcluidoEm(nova) });
+    } catch (err) {
+      console.log('Erro ao salvar data de conclusão:', err);
+      o.concluidoEm = anterior;
+      o.timeline.pop();
+      if (typeof mostrarToast === 'function') mostrarToast('Não salvou', 'Data de conclusão não foi gravada — ' + (err.code || err.message), '');
+    }
+  }
+  openDetail(orderId);
+  render();
+}
+
 async function savePrazo(orderId, valor) {
   if (!valor) return;
   const o = orders.find(x => x.id === orderId);
@@ -4011,6 +4192,12 @@ function passaFiltros(o, opts) {
 
   if (f.prazo.length && !f.prazo.some(function (pz) { return matchPeriodo(o, pz, 'deadline'); })) return false;
 
+  // Concluído em: usa concluidoEm (quando FECHOU), não deadline (quando devia fechar)
+  if (f.concl.length) {
+    if (!o.concluidoEm) return false;
+    if (!f.concl.some(function (pz) { return matchPeriodo(o, pz, 'concluidoEm'); })) return false;
+  }
+
   return true;
 }
 
@@ -4260,13 +4447,14 @@ document.getElementById('saveNew').addEventListener('click', async () => {
   }
 
   try {
-    await addDoc(collection(db, 'planner'), {
+    const _novoDoc = {
       titulo: title,
       descricao: desc,
       setor: local,
       solicitante: assignee || 'Miguel K.',
       prioridade: prioridade,
       status: statusNovo,
+      concluidoEm: (statusNovo === 'concluido') ? fmtConcluidoEm(new Date()) : null,
       origem: 'painel',
       dataAbertura: dataAbertura,
       horaAbertura: horaAbertura,
@@ -4278,6 +4466,14 @@ document.getElementById('saveNew').addEventListener('click', async () => {
         obs: 'Status inicial: ' + ({aberto:'Não iniciado', andamento:'Em andamento', concluido:'Concluído'}[statusNovo] || statusNovo)
       }],
       fotos: []
+    };
+    const _ref = await addDoc(collection(db, 'planner'), _novoDoc);
+    // criação desfazível: undo apaga, redo cria de novo (id novo, guardado no ref)
+    registrarAcao({
+      texto: 'criação de "' + title + '"',
+      _id: _ref.id,
+      desfazer: function(){ var self=this; return deleteDoc(doc(db, 'planner', self._id)); },
+      refazer:  function(){ var self=this; return addDoc(collection(db, 'planner'), _novoDoc).then(function(r){ self._id = r.id; }); }
     });
     // O onSnapshot vai sincronizar automaticamente e chamar render()
   } catch (err) {
@@ -4414,6 +4610,25 @@ function openDetail(id) {
               </div>
             </div>
           </div>
+          ${o.status === 'done' ? `
+          <div>
+            <div class="detail-label">Concluída em</div>
+            <div class="prazo-current" id="cemView_${o.id.replace(/[^a-zA-Z0-9]/g,'_')}">
+              <span class="prazo-current-text">${o.concluidoEm ? fmtConcluidoEm(o.concluidoEm) : '<span style="color:var(--ink-mute)">não registrado</span>'}</span>
+              <button class="prazo-edit-btn" data-edit-cem="${o.id}">Corrigir</button>
+            </div>
+            <div class="prazo-edit" id="cemEdit_${o.id.replace(/[^a-zA-Z0-9]/g,'_')}" style="display:none;">
+              <div class="prazo-input-wrap">
+                <input type="datetime-local" class="prazo-input" data-cem-input="${o.id}" value="${o.concluidoEm ? toLocalDatetime(o.concluidoEm) : ''}">
+                <button class="prazo-save-btn" data-save-cem="${o.id}">OK</button>
+              </div>
+              <div class="prazo-quick">
+                <button class="prazo-quick-btn" data-cem-quick="${o.id}" data-q="agora">Agora</button>
+                <button class="prazo-quick-btn" data-cem-quick="${o.id}" data-q="ontem">Ontem</button>
+                <button class="prazo-quick-btn" data-cem-quick="${o.id}" data-q="cancel">Cancelar</button>
+              </div>
+            </div>
+          </div>` : ''}
           <div>
             <div class="detail-label">Restante</div>
             <div class="detail-value" style="font-family:var(--display); font-size:18px; color: ${o.status==='done' ? 'var(--green)' : (cls==='crit'?'var(--red)':'var(--orange)')};">${dl.time} ${dl.label !== 'Faltam' && dl.label !== 'Feito' ? '· ' + dl.label : ''}</div>
@@ -4538,7 +4753,10 @@ function openDetail(id) {
   document.querySelectorAll('#detailContent [data-act]').forEach(b => {
     b.addEventListener('click', async () => {
       const o2 = orders.find(x => x.id === b.dataset.id);
+      const _stAntes = o2.status;
+      const _cAntes2 = o2.concluidoEm || null;
       o2.status = b.dataset.act;
+      o2.concluidoEm = (b.dataset.act === 'done') ? new Date() : null;
       o2.timeline.push({
         time: 'Agora',
         text: `Status alterado para "${statusLabel(b.dataset.act)}" por Miguel K.`
@@ -4547,7 +4765,11 @@ function openDetail(id) {
       if (o2.fromFirebase && o2.firestoreId) {
         const fbStatus = { open: 'aberto', progress: 'andamento', done: 'concluido', waiting_part: 'aguardando_peca', waiting_auth: 'aguardando_autorizacao', paused: 'pausada' }[b.dataset.act];
         try {
-          await updateDoc(doc(db, 'planner', o2.firestoreId), { status: fbStatus });
+          await updateDoc(doc(db, 'planner', o2.firestoreId), {
+            status: fbStatus,
+            concluidoEm: (b.dataset.act === 'done') ? fmtConcluidoEm(o2.concluidoEm) : null
+          });
+          registrarStatus(o2.firestoreId, o2.title, _stAntes, b.dataset.act, _cAntes2);
         } catch (err) {
           console.error('Erro ao sincronizar Firebase:', err);
         }
@@ -4581,6 +4803,9 @@ function openDetail(id) {
 
   // Bind editor de prazo
   bindPrazoEditor(o.id);
+
+  // Bind correção da data de conclusão
+  bindConcluidoEmEditor(o.id);
 
   // Bind editor de setor
   bindSetorEditor(o.id);
@@ -4950,6 +5175,28 @@ function prioToOrder(prioridade) {
   return map[prioridade] || 'med';
 }
 
+/* ===== concluidoEm: quando a tarefa foi REALMENTE fechada =====
+   Separado do dataConclusao, que é PRAZO. O nome do campo antigo engana:
+   "dataConclusao" significa "quando devo concluir", não "quando concluí".
+   Guardado como 'DD/MM/YYYY HH:MM'. Editável, porque o João pode fechar na
+   segunda algo que terminou na sexta. */
+function fmtConcluidoEm(d){
+  if(!d) return '';
+  var x = new Date(d);
+  if (isNaN(x.getTime())) return '';
+  var p = function(n){ return String(n).padStart(2,'0'); };
+  return p(x.getDate())+'/'+p(x.getMonth()+1)+'/'+x.getFullYear()+' '+p(x.getHours())+':'+p(x.getMinutes());
+}
+function parseConcluidoEm(str){
+  if(!str) return null;
+  var partes = String(str).trim().split(' ');
+  var d = partes[0].split('/');
+  if (d.length !== 3) return null;
+  var hm = (partes[1] || '00:00').split(':');
+  var dt = new Date(+d[2], +d[1]-1, +d[0], +(hm[0]||0), +(hm[1]||0));
+  return isNaN(dt.getTime()) ? null : dt;
+}
+
 function parseDataBR(dataStr) {
   if (!dataStr) return null;
   const parts = dataStr.split('/');
@@ -5014,7 +5261,8 @@ function fbToOrder(doc) {
     areaOrigem: c.areaOrigem || null,
     solicitante: c.solicitante || '',
     fotos: c.fotos || [],
-    rotulos: Array.isArray(c.rotulos) ? c.rotulos : []
+    rotulos: Array.isArray(c.rotulos) ? c.rotulos : [],
+    concluidoEm: parseConcluidoEm(c.concluidoEm)
   };
 }
 
