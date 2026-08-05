@@ -2081,7 +2081,7 @@ body.agenda-mode #sharedFilters { display: none; }
 .filter-select:focus{border-color:var(--orange);}
 @media(max-width:760px){ .filter-selects{padding-left:18px;padding-right:18px;} .filter-sel-wrap{flex:1 1 100%;} .filter-select{flex:1;width:100%;} #config-btn{flex:1 1 100%;} }
 .tbl{ display:block; width:100%; }
-.tbl-head, .tbl-row{ display:grid; grid-template-columns: 2.2fr 1.3fr .9fr .9fr 1.2fr 1fr 1.4fr; gap:12px; align-items:center; padding:7px 22px; }
+.tbl-head, .tbl-row{ display:grid; grid-template-columns: 2.2fr 1.3fr .9fr .9fr 1.2fr 1fr 1fr 1.4fr; gap:12px; align-items:center; padding:7px 22px; }
 
 .tbl-head{ position:sticky; top:var(--head-h,0px); background:var(--bg-2); border-bottom:1px solid var(--line-2); font-family:var(--mono); font-size:9px; letter-spacing:.18em; text-transform:uppercase; color:var(--ink-mute); z-index:2; }
 .th-sort{ display:flex; align-items:center; gap:5px; cursor:pointer; user-select:none; -webkit-user-select:none; transition:color .12s; }
@@ -2102,6 +2102,13 @@ body.agenda-mode #sharedFilters { display: none; }
 .prio-dot{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:middle; }
 .tcell-rot{ display:flex; flex-wrap:wrap; gap:4px; white-space:normal; }
 .rotulo-tag{ display:inline-block; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:600; line-height:1.5; }
+.status-tag{ display:inline-block; padding:2px 8px; border-radius:6px; font-family:var(--mono); font-size:10px; font-weight:600; letter-spacing:.04em; line-height:1.6; white-space:nowrap; }
+.status-tag.open{ background:rgba(242,106,106,.16); color:var(--red); }
+.status-tag.progress{ background:rgba(245,176,19,.16); color:var(--yellow); }
+.status-tag.waiting_part{ background:rgba(91,141,239,.16); color:var(--blue); }
+.status-tag.waiting_auth{ background:rgba(139,107,184,.20); color:#B595D8; }
+.status-tag.paused{ background:rgba(120,128,145,.22); color:var(--ink-mute); }
+.status-tag.done{ background:rgba(28,196,126,.16); color:var(--green); }
 /* ---- barra de rolagem no verde do app (acompanha claro/escuro) ---- */
 * { scrollbar-width: thin; scrollbar-color: var(--scroll) transparent; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -2245,6 +2252,7 @@ select.cel-edit{ cursor:pointer; }
   /* reordena o cartão sem mexer no HTML */
   .tcell-title   { order:1; flex:1 1 100%; }
   .tcell-prio    { order:2; flex:0 0 auto; }
+  .tcell-status  { order:2; flex:0 0 auto; }
   .tcell-setor   { order:3; flex:1 1 auto; text-align:right; font-family:var(--mono); font-size:11px; letter-spacing:.08em; color:var(--ink-mute); text-transform:uppercase; }
   .tcell-rot     { order:4; flex:1 1 100%; }
   .tcell-date    { order:5; flex:0 0 auto; }
@@ -2626,6 +2634,7 @@ var COLUNAS = [
   { key: 'prazo',    label: 'Concluir',       edit: 'data'   },
   { key: 'setor',    label: 'Bucket',         edit: 'select' },
   { key: 'prio',     label: 'Prioridade',     edit: 'select' },
+  { key: 'status',   label: 'Status',         edit: 'modal'  },
   { key: 'rotulos',  label: 'Rótulos',        edit: 'modal'  }
 ];
 
@@ -2636,6 +2645,7 @@ function valorColuna(o, key) {
   if (key === 'prazo')    return o.deadline ? new Date(o.deadline).getTime() : null;
   if (key === 'setor')    return o.local || '';
   if (key === 'rotulos')  return (o.rotulos || []).join(', ');
+  if (key === 'status')   { var _sr = { open:0, progress:1, waiting_part:2, waiting_auth:3, paused:4, done:5 }[o.status]; return (_sr === undefined) ? 9 : _sr; }
   if (key === 'prio') {
     // crescente = mais urgente primeiro
     var r = { crit: 0, high: 1, med: 2, low: 3 }[o.priority];
@@ -4276,6 +4286,7 @@ function render() {
         <div class="tcell tcell-date ${overdue ? 'overdue' : ''}" data-l="Concluir">${fmtD(o.deadline)}</div>
         <div class="tcell tcell-setor">${o.local || '—'}</div>
         <div class="tcell tcell-prio"><span class="prio-dot" style="background:${prioDot[o.priority] || 'var(--ink-mute)'}"></span>${priorityLabel(o.priority)}</div>
+        <div class="tcell tcell-status"><span class="status-tag ${o.status}">${statusLabel(o.status)}</span></div>
         <div class="tcell tcell-rot">${rotTags(o.rotulos)}</div>
       </div>`;
   }).join('');
