@@ -2096,6 +2096,11 @@ body.agenda-mode #sharedFilters { display: none; }
 .tbl-row.crit{ border-left-color:var(--red); } .tbl-row.high{ border-left-color:var(--yellow); } .tbl-row.med{ border-left-color:var(--blue); } .tbl-row.low{ border-left-color:var(--ink-mute); } .tbl-row.done{ border-left-color:var(--green); opacity:.6; }
 .tcell{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
 .tcell-title{ display:flex; align-items:center; gap:8px; white-space:normal; }
+.rec-sel{ width:100%; background:var(--panel,#1a1a1a); color:inherit; border:1px solid var(--steel,#4f4f4f);
+          border-radius:7px; padding:8px 10px; font-family:inherit; font-size:13px; }
+.rec-selo{ font-size:10px; font-weight:600; letter-spacing:.2px; padding:2px 7px; border-radius:9px;
+           white-space:nowrap; background:rgba(86,135,168,.16); color:#7FB3D5;
+           border:1px solid rgba(86,135,168,.38); }
 .tbl-idtag{ font-family:var(--mono); font-size:9px; letter-spacing:.05em; color:var(--ink-mute); background:var(--bg-3); border:1px solid var(--line); border-radius:5px; padding:2px 6px; flex:0 0 auto; }
 .tbl-title{ font-weight:600; white-space:normal; }
 .tcell-date{ font-family:var(--mono); font-size:12px; color:var(--ink-mute); }
@@ -2498,6 +2503,20 @@ select.cel-edit{ cursor:pointer; }
         <div class="field">
           <label class="field-label">Prazo</label>
           <input type="datetime-local" id="newDeadline">
+        </div>
+        <div class="field">
+          <label class="field-label">Repetir</label>
+          <select id="newRecorrencia">
+            <option value="">Não repete</option>
+            <option value="1-dia">Todo dia</option>
+            <option value="1-semana">Toda semana</option>
+            <option value="2-semana">A cada 15 dias</option>
+            <option value="1-mes">Todo mês</option>
+            <option value="2-mes">A cada 2 meses</option>
+            <option value="3-mes">A cada 3 meses</option>
+            <option value="6-mes">A cada 6 meses</option>
+            <option value="1-ano">Todo ano</option>
+          </select>
         </div>
         <div class="field">
           <label class="field-label">Responsável</label>
@@ -2912,6 +2931,7 @@ async function alternarConclusao(o) {
         concluidoEm: (novo === 'done') ? fmtConcluidoEm(o.concluidoEm) : null
       });
       registrarStatus(o.firestoreId, o.title, antigo, novo, _cAntes);
+      if (novo === 'done') await criarProximaOcorrencia(o);
     } catch (err) {
       console.log('Erro ao concluir:', err);
       o.status = antigo;
@@ -2983,6 +3003,112 @@ async function refazer(){
   render();
   if (document.body.classList.contains('kanban-mode')) renderKanban();
   if (document.body.classList.contains('agenda-mode')) renderAgenda();
+}
+
+/* ===== RECORRÊNCIA =====
+   Modelo: a próxima ocorrência nasce quando a atual é CONCLUÍDA, nunca por
+   calendário. Assim uma obrigação mensal esquecida fica vermelha e sozinha,
+   em vez de acumular doze cópias atrasadas. O custo é que, sem concluir, ela
+   não se reprograma — o que é o comportamento certo para cobrança.
+   Guardado em recorrencia: { cada: N, unidade: 'dia'|'semana'|'mes'|'ano' }. */
+var REC_ROTULO = {
+  '1-dia':'Todo dia', '1-semana':'Toda semana', '2-semana':'A cada 15 dias',
+  '1-mes':'Todo mês', '2-mes':'A cada 2 meses', '3-mes':'A cada 3 meses',
+  '6-mes':'A cada 6 meses', '1-ano':'Todo ano'
+};
+
+function recChave(r){
+  if(!r || !r.unidade || !(r.cada>0)) return '';
+  return r.cada + '-' + r.unidade;
+}
+function recLabel(r){
+  var k=recChave(r);
+  if(!k) return '';
+  return REC_ROTULO[k] || ('A cada '+r.cada+' '+r.unidade+(r.cada>1?'s':''));
+}
+function recDeChave(k){
+  if(!k) return null;
+  var p=String(k).split('-');
+  var n=parseInt(p[0],10);
+  if(!isFinite(n) || n<=0 || !p[1]) return null;
+  return { cada:n, unidade:p[1] };
+}
+
+/* soma o intervalo preservando o dia do mês, com corte no fim de mês:
+   31/01 + 1 mês = 28/02, e não 03/03 como o Date faz sozinho */
+function recSomar(base, r){
+  var d=new Date(base.getTime());
+  if(r.unidade==='dia')    { d.setDate(d.getDate() + r.cada); return d; }
+  if(r.unidade==='semana') { d.setDate(d.getDate() + r.cada*7); return d; }
+  var meses = (r.unidade==='ano') ? r.cada*12 : r.cada;
+  var dia=d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + meses);
+  var ultimo=new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+  d.setDate(Math.min(dia, ultimo));
+  return d;
+}
+
+/* a partir de quando conta o próximo: do prazo antigo, para não deslizar.
+   Se o prazo já passou faz tempo, conta de hoje — senão a próxima já nasceria
+   atrasada, que é justamente o vício que a gente quer tirar da lista. */
+function recProximaData(prazoAntigo, r){
+  var hoje=new Date(); hoje.setHours(0,0,0,0);
+  var base=(prazoAntigo instanceof Date && !isNaN(prazoAntigo)) ? new Date(prazoAntigo.getTime()) : new Date();
+  var prox=recSomar(base, r);
+  var voltas=0;
+  while(prox < hoje && voltas < 240){ prox=recSomar(prox, r); voltas++; }
+  return prox;
+}
+
+function fmtDataBR(d){
+  return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
+}
+
+/* cria a ocorrência seguinte a partir da que acabou de ser concluída */
+async function criarProximaOcorrencia(o){
+  try{
+    if(!o || !o.fromFirebase || !o.firestoreId) return;
+    var r=o.recorrencia;
+    if(!recChave(r)) return;
+    var prox=recProximaData(o.deadline, r);
+    var agora=new Date();
+    var novo={
+      titulo: o.title,
+      descricao: (o.desc==='—' ? '' : o.desc) || '',
+      setor: o.local || '',
+      solicitante: o.assignee==='Não atribuído' ? '' : (o.assignee||''),
+      prioridade: priorityLabel(o.priority),
+      status: 'aberto',
+      concluidoEm: null,
+      origem: 'recorrencia',
+      recorrencia: { cada:r.cada, unidade:r.unidade },
+      recorrenciaDe: o.firestoreId,
+      dataAbertura: fmtDataBR(agora),
+      horaAbertura: String(agora.getHours()).padStart(2,'0')+':'+String(agora.getMinutes()).padStart(2,'0'),
+      dataConclusao: fmtDataBR(prox),
+      rotulos: Array.isArray(o.rotulos) ? o.rotulos.slice() : [],
+      historico: [{
+        data: fmtDataBR(agora),
+        hora: String(agora.getHours()).padStart(2,'0')+':'+String(agora.getMinutes()).padStart(2,'0'),
+        acao: 'Gerada automaticamente pela recorrência',
+        obs: recLabel(r)+' · anterior concluída em '+fmtDataBR(agora)
+      }],
+      fotos: []
+    };
+    await addDoc(collection(db,'planner'), novo);
+    /* a ocorrência concluída não repete mais: quem repete agora é a nova */
+    await updateDoc(doc(db,'planner',o.firestoreId), { recorrencia: null });
+    if(o.recorrencia) o.recorrencia=null;
+    if(typeof mostrarToast==='function'){
+      mostrarToast('Próxima agendada', o.title, recLabel(r)+' · '+fmtDataBR(prox));
+    }
+  }catch(e){
+    console.error('recorrencia/proxima:', e);
+    if(typeof mostrarToast==='function'){
+      mostrarToast('Recorrência falhou','Concluída, mas a próxima não foi criada — '+(e.code||e.message),'');
+    }
+  }
 }
 
 // grava um status pelo id, buscando o objeto atual na hora
@@ -4281,7 +4407,7 @@ function render() {
     const overdue = (o.status !== 'done' && o.deadline && new Date(o.deadline) < new Date());
     return `
       <div class="tbl-row ${cls}" data-id="${o.id}">
-        <div class="tcell tcell-title"><span class="tbl-idtag">${o.id}</span><span class="tbl-title">${o.title}</span></div>
+        <div class="tcell tcell-title"><span class="tbl-idtag">${o.id}</span><span class="tbl-title">${o.title}</span>${o.recorrencia ? `<span class="rec-selo" title="${recLabel(o.recorrencia)}">↻ ${recLabel(o.recorrencia)}</span>` : ''}</div>
         <div class="tcell tcell-assignee" data-l="Atribuída a">${o.assignee || '—'}</div>
         <div class="tcell tcell-date" data-l="Início">${fmtD(o.createdAt)}</div>
         <div class="tcell tcell-date ${overdue ? 'overdue' : ''}" data-l="Concluir">${fmtD(o.deadline)}</div>
@@ -4468,6 +4594,7 @@ document.getElementById('saveNew').addEventListener('click', async () => {
       status: statusNovo,
       concluidoEm: (statusNovo === 'concluido') ? fmtConcluidoEm(new Date()) : null,
       origem: 'painel',
+      recorrencia: recDeChave((document.getElementById('newRecorrencia')||{}).value || ''),
       dataAbertura: dataAbertura,
       horaAbertura: horaAbertura,
       dataConclusao: dataConclusao,
@@ -4709,6 +4836,19 @@ function openDetail(id) {
             </div>`}
 
       <div class="detail-section">
+        <div class="detail-label">Repetição</div>
+        <select class="rec-sel" data-id="${o.id}">
+          <option value=""${!o.recorrencia ? ' selected' : ''}>Não repete</option>
+          ${['1-dia','1-semana','2-semana','1-mes','2-mes','3-mes','6-mes','1-ano'].map(function(k){
+            return '<option value="'+k+'"'+(recChave(o.recorrencia)===k?' selected':'')+'>'+REC_ROTULO[k]+'</option>';
+          }).join('')}
+        </select>
+        <div style="font-size:11px;color:var(--ink-mute);margin-top:6px;line-height:1.5;">
+          A próxima é criada quando esta for concluída${o.recorrencia ? ' — '+recLabel(o.recorrencia).toLowerCase() : ''}.
+        </div>
+      </div>
+
+      <div class="detail-section">
         <div class="detail-label">Fotos (${(o.fotos || []).length})</div>
         <div style="font-size: 11px; color: var(--ink-mute); font-family: var(--mono); letter-spacing: 0.1em; margin-bottom: 8px;">As fotos vencem em 90 dias após o upload</div>
         <div class="photo-gallery-painel" id="painel-photos-${o.id.replace(/[^a-zA-Z0-9]/g,'_')}"></div>
@@ -4782,6 +4922,7 @@ function openDetail(id) {
             concluidoEm: (b.dataset.act === 'done') ? fmtConcluidoEm(o2.concluidoEm) : null
           });
           registrarStatus(o2.firestoreId, o2.title, _stAntes, b.dataset.act, _cAntes2);
+          if (b.dataset.act === 'done') await criarProximaOcorrencia(o2);
         } catch (err) {
           console.error('Erro ao sincronizar Firebase:', err);
         }
@@ -4791,6 +4932,29 @@ function openDetail(id) {
       if (document.body.classList.contains('kanban-mode')) renderKanban();
     });
   });
+  // troca da repetição, direto no painel de detalhe
+  modalDetail.querySelectorAll('.rec-sel').forEach(function(sel){
+    sel.addEventListener('change', async function(){
+      var alvo = orders.find(function(x){ return x.id === sel.dataset.id; });
+      if (!alvo) return;
+      var antes = alvo.recorrencia;
+      var nova  = recDeChave(sel.value);
+      alvo.recorrencia = nova;
+      if (!alvo.fromFirebase || !alvo.firestoreId) { render(); return; }
+      try {
+        await updateDoc(doc(db, 'planner', alvo.firestoreId), { recorrencia: nova });
+        render();
+      } catch (err) {
+        console.error('Erro ao gravar repetição:', err);
+        alvo.recorrencia = antes;
+        sel.value = recChave(antes);
+        if (typeof mostrarToast === 'function') {
+          mostrarToast('Não salvou', 'A repetição não foi gravada — ' + (err.code || err.message), '');
+        }
+      }
+    });
+  });
+
   const addBtn = document.getElementById('addComment');
   if (addBtn) {
     const send = () => {
@@ -5274,6 +5438,8 @@ function fbToOrder(doc) {
     solicitante: c.solicitante || '',
     fotos: c.fotos || [],
     rotulos: Array.isArray(c.rotulos) ? c.rotulos : [],
+    recorrencia: (c.recorrencia && c.recorrencia.unidade && c.recorrencia.cada > 0)
+                 ? { cada: c.recorrencia.cada, unidade: c.recorrencia.unidade } : null,
     concluidoEm: parseConcluidoEm(c.concluidoEm)
   };
 }
