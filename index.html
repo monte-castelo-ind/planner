@@ -2096,6 +2096,29 @@ body.agenda-mode #sharedFilters { display: none; }
 .tbl-row.crit{ border-left-color:var(--red); } .tbl-row.high{ border-left-color:var(--yellow); } .tbl-row.med{ border-left-color:var(--blue); } .tbl-row.low{ border-left-color:var(--ink-mute); } .tbl-row.done{ border-left-color:var(--green); opacity:.6; }
 .tcell{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
 .tcell-title{ display:flex; align-items:center; gap:8px; white-space:normal; }
+/* rótulos da Nova Demanda: suspenso para não ocupar espaço com 9 rótulos */
+.nrot-wrap{ position:relative; }
+.nrot-btn{ width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px;
+           background:var(--bg-2); border:1px solid var(--line-2); border-bottom:2px solid var(--steel);
+           color:var(--ink); padding:12px 14px; font-family:var(--sans); font-size:14px;
+           cursor:pointer; text-align:left; }
+.nrot-btn:hover{ border-bottom-color:var(--orange); }
+.nrot-btn.tem{ border-bottom-color:var(--orange); }
+.nrot-seta{ font-size:10px; opacity:.6; flex:0 0 auto; }
+#newRotTxt{ display:flex; flex-wrap:wrap; gap:5px; align-items:center; min-width:0; }
+#newRotTxt.vazio{ color:var(--ink-mute); }
+.nrot-pop{ display:none; position:absolute; top:calc(100% + 6px); left:0; right:0; z-index:40;
+           background:var(--bg); border:1px solid var(--line-2); border-top:2px solid var(--orange);
+           box-shadow:0 14px 40px rgba(0,0,0,.5); padding:12px; }
+.nrot-pop.open{ display:block; }
+.nrot-chips{ display:flex; flex-wrap:wrap; gap:8px; max-height:220px; overflow-y:auto; }
+.nrot-pe{ display:flex; gap:8px; border-top:1px solid var(--line); margin-top:11px; padding-top:10px; }
+.nrot-lim, .nrot-ok{ flex:1; padding:9px; font-family:var(--mono); font-size:10px;
+                     letter-spacing:.2em; text-transform:uppercase; cursor:pointer; border:none; }
+.nrot-lim{ background:transparent; border:1px solid var(--line-2); color:var(--ink-mute); }
+.nrot-lim:hover{ color:var(--ink); border-color:var(--ink); }
+.nrot-ok{ background:var(--orange); color:var(--bg); font-weight:600; }
+.nrot-ok:hover{ background:var(--orange-soft); color:var(--paper); }
 .rec-sel{ width:100%; background:var(--panel,#1a1a1a); color:inherit; border:1px solid var(--steel,#4f4f4f);
           border-radius:7px; padding:8px 10px; font-family:inherit; font-size:13px; }
 .rec-selo{ font-size:10px; font-weight:600; letter-spacing:.2px; padding:2px 7px; border-radius:9px;
@@ -2382,7 +2405,7 @@ select.cel-edit{ cursor:pointer; }
       </div>
     </div>
     <label class="filter-sel-wrap" id="ordenarWrap"><span class="filter-sel-label">Ordenar</span><select id="fOrdem" class="filter-select"></select><button type="button" id="fOrdemDir" class="ordem-dir" title="Inverter a ordem" aria-label="Inverter a ordem">↑</button></label>
-    <span class="atalhos-dica"><b>↑↓←→</b> navegar · <b>Shift+Espaço</b> linha · <b>F2</b> editar · <b>Enter</b> abrir · <b>Ctrl+Enter</b> concluir · <b>Ctrl+*</b> nova · <b>Ctrl+Z</b> desfazer · <b>Esc</b> fechar</span>
+    <span class="atalhos-dica"><b>↑↓←→</b> navegar · <b>Shift+Espaço</b> linha · <b>F2</b> editar · <b>Enter</b> abrir · <b>Ctrl+Enter</b> concluir · <b>Ctrl+*</b> nova · <b>Ctrl+Z</b> desfazer · <b>Ctrl+F</b> buscar · <b>Esc</b> fechar</span>
   </div>
   </div><!-- /#sharedFilters -->
 
@@ -2534,6 +2557,22 @@ select.cel-edit{ cursor:pointer; }
             <option>TERCEIRIZADO</option>
             <option>Não atribuído</option>
           </select>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">Rótulos</label>
+        <div class="nrot-wrap">
+          <button type="button" class="nrot-btn" id="newRotBtn">
+            <span id="newRotTxt">Nenhum rótulo</span>
+            <span class="nrot-seta">▾</span>
+          </button>
+          <div class="nrot-pop" id="newRotPop">
+            <div class="nrot-chips" id="newRotChips"></div>
+            <div class="nrot-pe">
+              <button type="button" class="nrot-lim" id="newRotLimpar">Limpar</button>
+              <button type="button" class="nrot-ok" id="newRotFechar">Pronto</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="field">
@@ -2714,6 +2753,13 @@ document.addEventListener('keydown', function (e) {
 
   // Esc tem prioridade: cancela edição > fecha modal > limpa cursor
   if (e.key === 'Escape') {
+    var _b = document.getElementById('searchInput');
+    if (_b && document.activeElement === _b) {
+      e.preventDefault();
+      if (_b.value) { _b.value = ''; _b.dispatchEvent(new Event('input', { bubbles: true })); }
+      else { _b.blur(); }
+      return;
+    }
     if (grid.editando) { e.preventDefault(); cancelarEdicao(); return; }
     var mv = document.querySelector('.mover-back.open');
     if (mv) { e.preventDefault(); mv.classList.remove('open'); return; }
@@ -2721,6 +2767,23 @@ document.addEventListener('keydown', function (e) {
     if (m) { e.preventDefault(); m.classList.remove('open'); return; }
     if (grid.row >= 0) { e.preventDefault(); grid.row = -1; grid.col = -1; grid.modo = 'celula'; aplicarCursor(); }
     return;
+  }
+
+  /* Ctrl+F vai para o filtro do Planner em vez do buscar do navegador.
+     O do Chrome acha só o que está desenhado na tela — com paginação de 60,
+     ele não enxerga o resto. O filtro daqui varre todas as tarefas carregadas.
+     Quem quiser o do navegador usa Ctrl+Shift+F, que não interceptamos. */
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key || '').toLowerCase() === 'f') {
+    var busca = document.getElementById('searchInput');
+    if (busca) {
+      e.preventDefault();
+      if (grid.editando) cancelarEdicao();
+      var m0 = modalAberto();
+      if (m0) m0.classList.remove('open');
+      busca.focus();
+      busca.select();
+      return;
+    }
   }
 
   // Ctrl+Z / Ctrl+Y (e Ctrl+Shift+Z) desfazem e refazem a última ação.
@@ -4508,6 +4571,9 @@ document.querySelectorAll('.stat[data-stat-filter]').forEach(s => {
 const modalNew = document.getElementById('modalNew');
 function abrirNovaDemanda() {
   modalNew.classList.add('open');
+  pintarNovoRotBtn();
+  var _p = document.getElementById('newRotPop');
+  if (_p) _p.classList.remove('open');
   const d = new Date(Date.now() + 4*60*60*1000);
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
   document.getElementById('newDeadline').value = d.toISOString().slice(0,16);
@@ -4524,6 +4590,82 @@ document.querySelectorAll('[data-close]').forEach(b => {
 modalNew.addEventListener('click', (e) => {
   if (e.target === modalNew) modalNew.classList.remove('open');
 });
+
+/* ===== Rótulos da Nova Demanda =====
+   Multi-seleção, em painel suspenso: a lista de rótulos cresce com o tempo e
+   nove chips soltos empurrariam o botão Registrar para fora da tela. */
+var novaRotulos = [];
+
+function pintarNovoRotBtn(){
+  var txt = document.getElementById('newRotTxt');
+  var btn = document.getElementById('newRotBtn');
+  if(!txt || !btn) return;
+  if(!novaRotulos.length){
+    txt.className = 'vazio';
+    txt.textContent = 'Nenhum rótulo';
+    btn.classList.remove('tem');
+    return;
+  }
+  txt.className = '';
+  txt.innerHTML = novaRotulos.map(function(n){
+    var c = rotuloCor(n);
+    return '<span class="rotulo-tag" style="background:'+c+';color:'+corTexto(c)+'">'+n+'</span>';
+  }).join('');
+  btn.classList.add('tem');
+}
+
+function pintarNovoRotChips(){
+  var box = document.getElementById('newRotChips');
+  if(!box) return;
+  if(!ROTULOS.length){
+    box.innerHTML = '<span style="font-size:12px;color:var(--ink-mute);">Nenhum rótulo cadastrado — crie em Configuração.</span>';
+    return;
+  }
+  box.innerHTML = ROTULOS.map(function(r){
+    var on = novaRotulos.some(function(x){ return normNome(x) === normNome(r.nome); });
+    var cor = r.cor || '#8a91a3';
+    return '<button type="button" data-nrot="'+String(r.nome).replace(/"/g,'&quot;')+'" '
+      + 'style="background:'+(on?cor:'transparent')+';color:'+(on?corTexto(cor):'var(--ink)')
+      + ';border:1px solid '+(on?cor:'var(--line-2)')+';border-radius:6px;padding:6px 11px;'
+      + 'font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">'
+      + '<span style="width:9px;height:9px;border-radius:3px;background:'+cor+';display:inline-block;"></span>'
+      + r.nome + (on ? ' ✓' : '') + '</button>';
+  }).join('');
+  box.querySelectorAll('[data-nrot]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var nome = b.getAttribute('data-nrot');
+      var i = novaRotulos.findIndex(function(x){ return normNome(x) === normNome(nome); });
+      if(i >= 0) novaRotulos.splice(i,1); else novaRotulos.push(nome);
+      pintarNovoRotChips();
+      pintarNovoRotBtn();
+    });
+  });
+}
+
+(function(){
+  var btn = document.getElementById('newRotBtn');
+  var pop = document.getElementById('newRotPop');
+  var wrap = btn && btn.closest('.nrot-wrap');
+  if(!btn || !pop) return;
+  btn.addEventListener('click', function(e){
+    e.stopPropagation();
+    var abrindo = !pop.classList.contains('open');
+    if(abrindo) pintarNovoRotChips();
+    pop.classList.toggle('open', abrindo);
+  });
+  document.addEventListener('click', function(e){
+    if(wrap && !wrap.contains(e.target)) pop.classList.remove('open');
+  });
+  var fec = document.getElementById('newRotFechar');
+  if(fec) fec.addEventListener('click', function(e){ e.stopPropagation(); pop.classList.remove('open'); });
+  var lim = document.getElementById('newRotLimpar');
+  if(lim) lim.addEventListener('click', function(e){
+    e.stopPropagation();
+    novaRotulos = [];
+    pintarNovoRotChips();
+    pintarNovoRotBtn();
+  });
+})();
 
 let selPrio = 'med';
 document.querySelectorAll('#prioGroup .priority-opt').forEach(p => {
@@ -4594,6 +4736,7 @@ document.getElementById('saveNew').addEventListener('click', async () => {
       status: statusNovo,
       concluidoEm: (statusNovo === 'concluido') ? fmtConcluidoEm(new Date()) : null,
       origem: 'painel',
+      rotulos: novaRotulos.slice(),
       recorrencia: recDeChave((document.getElementById('newRecorrencia')||{}).value || ''),
       dataAbertura: dataAbertura,
       horaAbertura: horaAbertura,
@@ -4627,6 +4770,10 @@ document.getElementById('saveNew').addEventListener('click', async () => {
   document.getElementById('newLocal').selectedIndex = 0;
   document.getElementById('newStatus').value = 'aberto';
   document.getElementById('newDesc').value = '';
+  novaRotulos = [];
+  pintarNovoRotBtn();
+  var _rp = document.getElementById('newRotPop');
+  if (_rp) _rp.classList.remove('open');
   modalNew.classList.remove('open');
   btn.disabled = false;
   btn.textContent = originalLabel;
